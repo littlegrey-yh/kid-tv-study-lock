@@ -49,8 +49,14 @@ public class MainActivity extends Activity {
 
         btnOverlay = button("", new View.OnClickListener() {
             @Override public void onClick(View v) {
-                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" + getPackageName())));
+                try {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName())));
+                } catch (Exception e) {
+                    // 部分ROM（如雷鸟）不支持该跳转，权限已在安装时通过ADB授予
+                    statusText.setText("此系统不支持直接跳转授权页。悬浮窗权限通常已自动授予；"
+                            + "如未生效请到 系统设置 → 应用 → 学习门禁 里查找权限开关。");
+                }
             }
         });
         root.addView(btnOverlay);
@@ -59,7 +65,10 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) {
                 try {
                     startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
-                } catch (Exception ignored) { }
+                } catch (Exception e) {
+                    statusText.setText("此系统不支持直接跳转授权页，请到 系统设置 里查找"
+                            + "\"使用情况访问权限\"并允许学习门禁。");
+                }
             }
         });
         root.addView(btnUsage);

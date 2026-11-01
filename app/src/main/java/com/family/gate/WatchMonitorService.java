@@ -150,7 +150,11 @@ public class WatchMonitorService extends Service {
     public static void stop(Context ctx) {
         Intent i = new Intent(ctx, WatchMonitorService.class);
         i.setAction("STOP");
-        if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
-        else ctx.startService(i);
+        try {
+            // 停止运行中的前台服务必须用普通 startService：
+            // startForegroundService + 立即 stopSelf 在部分 ROM 会抛
+            // "did not then call startForeground" 导致整个进程崩溃
+            ctx.startService(i);
+        } catch (Exception ignored) { }
     }
 }
