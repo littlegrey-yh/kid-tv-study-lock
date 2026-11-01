@@ -45,32 +45,23 @@ public class WatchMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(new NotificationChannel("watch", "观看监控",
-                    NotificationManager.IMPORTANCE_LOW));
-            Notification n = new Notification.Builder(this, "watch")
-                    .setContentTitle("学习门禁 · 观看监控中")
-                    .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-                    .build();
-            startForeground(43, n);
-        } else {
-            Notification n = new Notification.Builder(this)
-                    .setContentTitle("学习门禁 · 观看监控中")
-                    .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-                    .build();
-            startForeground(43, n);
-        }
+        startForegroundCompat();
         running = true;
-        handler.postDelayed(tick, CHECK_INTERVAL_MS);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && "STOP".equals(intent.getAction())) {
+        String action = intent == null ? "" : intent.getAction();
+        if ("STOP".equals(action)) {
             stopSelf();
             return START_NOT_STICKY;
         }
+        // TCL ROM 严格校验：每次 startForegroundService() 之后都必须补调 startForeground()，
+        // 即使服务已在前台运行，重复调用是幂等的、无害
+        startForegroundCompat();
+        running = true;
+        handler.removeCallbacks(tick);
+        handler.postDelayed(tick, CHECK_INTERVAL_MS);
         return START_STICKY;
     }
 
@@ -108,6 +99,26 @@ public class WatchMonitorService extends Service {
     /** 可观测日志（该 ROM 屏蔽 Log.d，必须用 Log.i） */
     private void diag(String msg) {
         android.util.Log.i("LearningGate", "[监控] " + msg);
+    }
+
+    /** 提升为前台服务（幂等，可重复调用） */
+    private void startForegroundCompat() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(new NotificationChannel("watch", "观看监控",
+                    NotificationManager.IMPORTANCE_LOW));
+            Notification n = new Notification.Builder(this, "watch")
+                    .setContentTitle("学习门禁 · 观看监控中")
+                    .setSmallIcon(android.R.drawable.ic_menu_recent_history)
+                    .build();
+            startForeground(43, n);
+        } else {
+            Notification n = new Notification.Builder(this)
+                    .setContentTitle("学习门禁 · 观看监控中")
+                    .setSmallIcon(android.R.drawable.ic_menu_recent_history)
+                    .build();
+            startForeground(43, n);
+        }
     }
 
     private String lastForeground = null;

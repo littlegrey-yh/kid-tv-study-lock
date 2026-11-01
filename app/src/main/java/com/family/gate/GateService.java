@@ -93,6 +93,9 @@ public class GateService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        // TCL ROM 严格校验：每次 startForegroundService() 之后必须补调 startForeground()
+        //（即使服务已在前台，重复调用幂等无害），否则整个进程被杀
+        startForegroundCompat();
         // 开机弹题：需总开关 + 开机弹题开关都打开
         if (ACTION_SHOW_BOOT.equals(action)
                 && (!Prefs.gateEnabled(this) || !Prefs.bootQuizEnabled(this))) {
