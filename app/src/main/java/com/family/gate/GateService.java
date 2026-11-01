@@ -42,7 +42,7 @@ public class GateService extends Service {
     private static final int MODE_QUIZ = 0, MODE_PIN = 1, MODE_DURATION = 2;
 
     private WindowManager wm;
-    private View root;
+    private LinearLayout root;
     private int mode = MODE_QUIZ;
 
     private TextView titleText, progressText, stemText, hintText;

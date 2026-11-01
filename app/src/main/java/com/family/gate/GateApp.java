@@ -33,12 +33,8 @@ public class GateApp extends Application {
         if (adminServer != null) return;
         try {
             adminServer = new AdminServer(this, 8765);
-            adminServer.start(NanoHttpdStartFlag());
+            adminServer.start(5000, true); // 5秒超时、守护线程运行
         } catch (Exception ignored) { }
-    }
-
-    private static boolean NanoHttpdStartFlag() {
-        return true; // daemon 线程运行
     }
 
     private void startWatchMonitor() {
