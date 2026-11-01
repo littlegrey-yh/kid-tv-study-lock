@@ -12,19 +12,24 @@ public class QuizEngine {
 
     private final List<Question> queue = new ArrayList<>();
     private final List<Long> usedIds = new ArrayList<>();
+    private final Db db;
+    private final int maxGrade, maxTerm;
     public int wrongCount = 0;
     public int answeredCount = 0;
     public final int initialCount;
 
-    private QuizEngine(List<Question> initial) {
+    private QuizEngine(Db db, List<Question> initial, int maxGrade, int maxTerm) {
+        this.db = db;
+        this.maxGrade = maxGrade;
+        this.maxTerm = maxTerm;
         queue.addAll(initial);
         initialCount = initial.size();
         for (Question q : initial) usedIds.add(q.id);
     }
 
-    /** 开启一轮 n 道题的答题 */
-    public static QuizEngine start(Db db, int n) {
-        return new QuizEngine(db.pickRandom(n, null));
+    /** 开启一轮 n 道题的答题（从年级池抽题） */
+    public static QuizEngine start(Db db, int n, int maxGrade, int maxTerm) {
+        return new QuizEngine(db, db.pickRandom(n, null, maxGrade, maxTerm), maxGrade, maxTerm);
     }
 
     public boolean isDone()      { return queue.isEmpty(); }
@@ -47,8 +52,8 @@ public class QuizEngine {
             wrongCount++;
             // 本题重新入队尾
             queue.add(q);
-            // 追加 2 道新题（题库不足时有多少补多少）
-            List<Question> extra = db.pickRandom(2, usedIds);
+            // 追加 2 道新题（年级池内题量不足时有多少补多少）
+            List<Question> extra = db.pickRandom(2, usedIds, maxGrade, maxTerm);
             for (Question e : extra) {
                 queue.add(e);
                 usedIds.add(e.id);

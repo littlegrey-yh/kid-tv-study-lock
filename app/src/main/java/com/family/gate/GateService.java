@@ -102,7 +102,9 @@ public class GateService extends Service {
     private void showOverlay(String action) {
         if (root != null) { render(); return; }
         boolean boot = ACTION_SHOW_BOOT.equals(action);
-        engine = QuizEngine.start(Db.get(this), boot ? Prefs.bootQuestions(this) : 3);
+        engine = QuizEngine.start(Db.get(this),
+                boot ? Prefs.bootQuestions(this) : 3,
+                Prefs.kidGrade(this), Prefs.kidTerm(this));
         sel = 0;
         mode = MODE_QUIZ;
         buildUi(boot);

@@ -23,7 +23,7 @@ public class Db extends SQLiteOpenHelper {
     }
 
     private Db(Context c) {
-        super(c, "gate.db", null, 1);
+        super(c, "gate.db", null, 2);
     }
 
     @Override
@@ -31,6 +31,7 @@ public class Db extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE questions("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "subject TEXT, difficulty INTEGER DEFAULT 2,"
+                + "grade INTEGER DEFAULT 3, term INTEGER DEFAULT 1,"
                 + "stem TEXT NOT NULL,"
                 + "optA TEXT, optB TEXT, optC TEXT, optD TEXT,"
                 + "answer TEXT NOT NULL, explanation TEXT,"
@@ -41,7 +42,12 @@ public class Db extends SQLiteOpenHelper {
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, int oldV, int newV) { }
+    public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
+        if (oldV < 2) {
+            db.execSQL("ALTER TABLE questions ADD COLUMN grade INTEGER DEFAULT 3");
+            db.execSQL("ALTER TABLE questions ADD COLUMN term INTEGER DEFAULT 1");
+        }
+    }
 
     // ---- 题目管理 ----
 
@@ -50,6 +56,8 @@ public class Db extends SQLiteOpenHelper {
         ContentValues cv = new ContentValues();
         cv.put("subject", q.subject);
         cv.put("difficulty", q.difficulty);
+        cv.put("grade", q.grade);
+        cv.put("term", q.term);
         cv.put("stem", q.stem);
         cv.put("optA", q.optA);
         cv.put("optB", q.optB);
@@ -89,23 +97,27 @@ public class Db extends SQLiteOpenHelper {
         return n;
     }
 
-    /** 随机抽 n 道启用的题（尽量避开 excludeIds 中的题；题不够时可重复） */
-    public List<Question> pickRandom(int n, List<Long> excludeIds) {
+    /**
+     * 随机抽 n 道启用的题，年级池 = (grade < maxGrade) 或 (grade == maxGrade 且 term <= maxTerm)。
+     * 尽量避开 excludeIds 中的题；题不够时可重复。
+     */
+    public List<Question> pickRandom(int n, List<Long> excludeIds, int maxGrade, int maxTerm) {
         List<Question> out = new ArrayList<>();
         if (n <= 0) return out;
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery(
-                "SELECT * FROM questions WHERE enabled=1 ORDER BY RANDOM()",
-                null);
+                "SELECT * FROM questions WHERE enabled=1 AND "
+                        + "(grade < ? OR (grade = ? AND term <= ?)) ORDER BY RANDOM()",
+                new String[]{String.valueOf(maxGrade), String.valueOf(maxGrade), String.valueOf(maxTerm)});
         while (c.moveToNext() && out.size() < n) {
             Question q = fromCursor(c);
             if (excludeIds != null && excludeIds.contains(q.id)) continue;
             out.add(q);
         }
         c.close();
-        // 题库不足时放宽限制补齐
+        // 年级池内题量不足时放宽限制补齐
         while (out.size() < n && countEnabled() > 0) {
-            List<Question> more = pickRandom(1, null);
+            List<Question> more = pickRandom(1, null, 6, 2);
             if (more.isEmpty()) break;
             out.add(more.get(0));
         }
@@ -120,8 +132,51 @@ public class Db extends SQLiteOpenHelper {
         getWritableDatabase().insert("attempts", null, cv);
     }
 
-    /** 批量导入题目，返回导入条数 */
-    public int importJson(String json) throws Exception {
+    /** 按天×科目聚合答题正确率（最近 days 天），供管理页薄弱折线图 */
+    public JSONArray statsBySubject(int days) throws Exception {
+        long since = System.currentTimeMillis() - days * 86400000L;
+        Cursor c = getReadableDatabase().rawQuery(
+                "SELECT date(a.ts/1000, 'unixepoch', 'localtime') d, q.subject s, "
+                        + "COUNT(*) total, SUM(a.correct) ok FROM attempts a "
+                        + "JOIN questions q ON a.qid = q.id WHERE a.ts >= ? "
+                        + "GROUP BY d, s ORDER BY d",
+                new String[]{String.valueOf(since)});
+        JSONArray arr = new JSONArray();
+        while (c.moveToNext()) {
+            JSONObject o = new JSONObject();
+            o.put("day", c.getString(0));
+            o.put("subject", c.getString(1));
+            o.put("total", c.getInt(2));
+            o.put("ok", c.getInt(3));
+            arr.put(o);
+        }
+        c.close();
+        return arr;
+    }
+
+    /** 错误最多的题 Top N（薄弱题清单） */
+    public JSONArray weakQuestions(int limit) throws Exception {
+        Cursor c = getReadableDatabase().rawQuery(
+                "SELECT q.subject s, q.stem, COUNT(*) total, SUM(a.correct) ok "
+                        + "FROM attempts a JOIN questions q ON a.qid = q.id "
+                        + "GROUP BY a.qid HAVING ok < total "
+                        + "ORDER BY (total - ok) DESC LIMIT ?",
+                new String[]{String.valueOf(limit)});
+        JSONArray arr = new JSONArray();
+        while (c.moveToNext()) {
+            JSONObject o = new JSONObject();
+            o.put("subject", c.getString(0));
+            o.put("stem", c.getString(1));
+            o.put("total", c.getInt(2));
+            o.put("ok", c.getInt(3));
+            arr.put(o);
+        }
+        c.close();
+        return arr;
+    }
+
+    /** 批量导入题目，未带年级信息的题使用默认年级/学期，返回导入条数 */
+    public int importJson(String json, int defGrade, int defTerm) throws Exception {
         JSONArray arr;
         JSONObject top = new JSONObject(json);
         arr = top.optJSONArray("questions");
@@ -131,6 +186,8 @@ public class Db extends SQLiteOpenHelper {
             Question q = Question.fromJson(arr.getJSONObject(i));
             if (q.stem != null && !q.stem.trim().isEmpty()) {
                 q.id = 0; // 导入一律新增
+                if (q.grade < 1 || q.grade > 6) q.grade = defGrade;
+                if (q.term < 1 || q.term > 2) q.term = defTerm;
                 addQuestion(q);
                 n++;
             }
@@ -155,6 +212,8 @@ public class Db extends SQLiteOpenHelper {
         q.id = c.getLong(c.getColumnIndexOrThrow("id"));
         q.subject = c.getString(c.getColumnIndexOrThrow("subject"));
         q.difficulty = c.getInt(c.getColumnIndexOrThrow("difficulty"));
+        q.grade = c.getInt(c.getColumnIndexOrThrow("grade"));
+        q.term = c.getInt(c.getColumnIndexOrThrow("term"));
         q.stem = c.getString(c.getColumnIndexOrThrow("stem"));
         q.optA = c.getString(c.getColumnIndexOrThrow("optA"));
         q.optB = c.getString(c.getColumnIndexOrThrow("optB"));

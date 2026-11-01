@@ -28,6 +28,12 @@ public class Prefs {
     public static int quizIntervalMin(Context c)            { return get(c).getInt("quizIntervalMin", 10); }
     public static void setQuizIntervalMin(Context c, int v) { get(c).edit().putInt("quizIntervalMin", v).apply(); }
 
+    /** 孩子当前学年（1-6）与学期（1=上 2=下），抽题池 = 学过的一切 */
+    public static int kidGrade(Context c)            { return get(c).getInt("kidGrade", 3); }
+    public static void setKidGrade(Context c, int v) { get(c).edit().putInt("kidGrade", v).apply(); }
+    public static int kidTerm(Context c)             { return get(c).getInt("kidTerm", 1); }
+    public static void setKidTerm(Context c, int v)  { get(c).edit().putInt("kidTerm", v).apply(); }
+
     public static boolean watchMonitorEnabled(Context c)            { return get(c).getBoolean("watchMonitorEnabled", false); }
     public static void setWatchMonitorEnabled(Context c, boolean v) { get(c).edit().putBoolean("watchMonitorEnabled", v).apply(); }
 

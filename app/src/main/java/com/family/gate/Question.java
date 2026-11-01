@@ -9,6 +9,8 @@ public class Question {
     public long id;
     public String subject;   // 科目：语文/数学/英语...
     public int difficulty;   // 1易 2中 3难
+    public int grade = 3;    // 学年 1-6
+    public int term = 1;     // 学期 1=上 2=下
     public String stem;      // 题干
     public String optA, optB, optC, optD;
     public String answer;    // "A" / "B" / "C" / "D"
@@ -35,6 +37,8 @@ public class Question {
             o.put("id", id);
             o.put("subject", subject);
             o.put("difficulty", difficulty);
+            o.put("grade", grade);
+            o.put("term", term);
             o.put("stem", stem);
             o.put("optA", optA);
             o.put("optB", optB);
@@ -52,6 +56,8 @@ public class Question {
         q.id = o.optLong("id", 0);
         q.subject = o.optString("subject", "通用");
         q.difficulty = o.optInt("difficulty", 2);
+        q.grade = o.optInt("grade", 0);
+        q.term = o.optInt("term", 0);
         q.stem = o.optString("stem", "");
         q.optA = o.optString("optA", null);
         q.optB = o.optString("optB", null);

@@ -40,6 +40,15 @@
   <div><label>开机答题数（答对几题放行）</label><select id="bootQuestions"><option>3</option><option>5</option><option>10</option></select></div>
   <div><label>弹题间隔（分钟）</label><select id="quizIntervalMin"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
 </div>
+<label>孩子当前年级（抽题范围 = 该年级及以前所有学年，如选"三年级上"则考一上~三上全部题目）</label>
+<select id="kidGradeTerm">
+  <option value="1-1">一年级上</option><option value="1-2">一年级下</option>
+  <option value="2-1">二年级上</option><option value="2-2">二年级下</option>
+  <option value="3-1">三年级上</option><option value="3-2">三年级下</option>
+  <option value="4-1">四年级上</option><option value="4-2">四年级下</option>
+  <option value="5-1">五年级上</option><option value="5-2">五年级下</option>
+  <option value="6-1">六年级上</option><option value="6-2">六年级下</option>
+</select>
 <label>观看监控（每满弹题间隔弹出答题，v0.8 完整支持）</label>
 <select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select>
 <label>家长方向密码（4-12位，U/D/L/R 组合，改完遥控器输入也随之变化）</label>
@@ -52,7 +61,8 @@
 <h2>添加题目</h2>
 <div class="row">
   <div><label>科目</label><input id="subject" placeholder="语文/数学/英语..."></div>
-  <div><label>难度</label><select id="difficulty"><option value="1">易</option><option value="2" selected>中</option><option value="3">难</option></select></div>
+  <div><label>所属年级学期</label><select id="qGradeTerm"></select></div>
+  <div><label>难度</label><select id="difficulty"><option value="1">易（送分/基础）</option><option value="2" selected>中（课后练习水平）</option><option value="3">难（拓展）</option></select></div>
   <div><label>答案</label><select id="answer"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
 </div>
 <label>题干</label><textarea id="stem" rows="2"></textarea>
@@ -75,8 +85,15 @@
 <button class="gray" onclick="exportJson()">导出全部题目</button>
 <div id="ioMsg" class="msg"></div>
 
+<h2>薄弱分析（近 14 天，按科目）</h2>
+<canvas id="chart" width="840" height="300" style="width:100%; border:1px solid #eee; border-radius:8px; background:#fff;"></canvas>
+<div id="chartLegend" class="tag" style="margin-top:6px;"></div>
+<h3 style="font-size:15px; margin-top:20px;">错得最多的题（Top 10）</h3>
+<table id="wtable"><thead><tr><th>科目</th><th>题干</th><th>答题次数</th><th>错误次数</th><th>正确率</th></tr></thead><tbody></tbody></table>
+<div id="weakEmpty" class="msg"></div>
+
 <h2>题库（<span id="count">0</span> 题）</h2>
-<table id="qtable"><thead><tr><th>科目</th><th>题干</th><th>答案</th><th>启用</th><th></th></tr></thead><tbody></tbody></table>
+<table id="qtable"><thead><tr><th>科目</th><th>年级</th><th>题干</th><th>答案</th><th>启用</th><th></th></tr></thead><tbody></tbody></table>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -95,6 +112,18 @@ async function refreshStatus() {
   } catch(e) { $('status').textContent = '无法连接电视，请确认手机与电视在同一 Wi-Fi。'; }
 }
 
+const GRADE_NAMES = {"1-1":"一上","1-2":"一下","2-1":"二上","2-2":"二下","3-1":"三上","3-2":"三下","4-1":"四上","4-2":"四下","5-1":"五上","5-2":"五下","6-1":"六上","6-2":"六下"};
+
+function fillGradeTermSelect(sel, defKey) {
+  sel.innerHTML = "";
+  for (const k in GRADE_NAMES) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = GRADE_NAMES[k];
+    sel.appendChild(o);
+  }
+  if (defKey) sel.value = defKey;
+}
+
 async function loadConfig() {
   const c = await api('/api/config');
   $('gateEnabled').value = String(c.gateEnabled);
@@ -103,15 +132,20 @@ async function loadConfig() {
   $('watchMonitorEnabled').value = String(c.watchMonitorEnabled);
   $('parentSeq').value = c.parentSeq;
   $('videoApps').value = c.videoApps;
+  fillGradeTermSelect($('kidGradeTerm'), c.kidGrade + '-' + c.kidTerm);
+  fillGradeTermSelect($('qGradeTerm'), c.kidGrade + '-' + c.kidTerm);
 }
 
 async function saveConfig() {
+  const gt = $('kidGradeTerm').value.split('-');
   const r = await api('/api/config', {
     gateEnabled: $('gateEnabled').value === 'true',
     bootQuestions: parseInt($('bootQuestions').value),
     quizIntervalMin: parseInt($('quizIntervalMin').value),
     watchMonitorEnabled: $('watchMonitorEnabled').value === 'true',
     parentSeq: $('parentSeq').value.trim(),
+    kidGrade: parseInt(gt[0]),
+    kidTerm: parseInt(gt[1]),
     videoApps: $('videoApps').value.trim()
   });
   $('cfgMsg').textContent = r.ok ? '已保存。' : ('保存失败：' + r.error);
@@ -120,9 +154,12 @@ async function saveConfig() {
 
 async function addQuestion() {
   if (!$('stem').value.trim()) { $('addMsg').textContent = '题干不能为空'; return; }
+  const gt = $('qGradeTerm').value.split('-');
   const r = await api('/api/questions', {
     subject: $('subject').value.trim() || '通用',
     difficulty: parseInt($('difficulty').value),
+    grade: parseInt(gt[0]),
+    term: parseInt(gt[1]),
     stem: $('stem').value.trim(),
     optA: $('optA').value.trim(), optB: $('optB').value.trim(),
     optC: $('optC').value.trim() || null, optD: $('optD').value.trim() || null,
@@ -140,7 +177,7 @@ async function loadQuestions() {
   tb.innerHTML = '';
   (data.questions || []).forEach(q => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${q.subject}</td><td>${q.stem}</td><td>${q.answer}</td>
+    tr.innerHTML = `<td>${q.subject}</td><td>${GRADE_NAMES[q.grade + '-' + q.term] || (q.grade + '上')}</td><td>${q.stem}</td><td>${q.answer}</td>
       <td><button class="gray" onclick="toggle(${q.id},${!q.enabled})">${q.enabled ? '停用' : '启用'}</button></td>
       <td><button class="red" onclick="del(${q.id})">删除</button></td>`;
     tb.appendChild(tr);
@@ -167,7 +204,88 @@ async function unlock(minutes) {
   $('unlockMsg').textContent = r.ok ? `电视已放行 ${minutes} 分钟。` : (r.error || '解锁失败');
 }
 
-refreshStatus(); loadConfig(); loadQuestions();
+// ---- 薄弱分析（按科目正确率折线图 + 薄弱题清单） ----
+const SUBJECT_COLORS = {"语文":"#C0392B","数学":"#1F6FB2","英语":"#8E6FB8"};
+const colorOf = s => SUBJECT_COLORS[s] || "#55883B";
+
+async function loadStats() {
+  let st;
+  try { st = await api('/api/stats'); } catch(e) { return; }
+  const rows = st.rows || [];
+  const days = [...new Set(rows.map(r => r.day))].sort();
+  const subjects = [...new Set(rows.map(r => r.subject))];
+  const byS = {};
+  subjects.forEach(s => byS[s] = {});
+  rows.forEach(r => {
+    const m = byS[r.subject][r.day] || (byS[r.subject][r.day] = {ok: 0, total: 0});
+    m.ok += r.ok; m.total += r.total;
+  });
+  drawChart(days, subjects, byS);
+  $('chartLegend').textContent = '纵轴为当日正确率（答对/答题次数），线越低说明该科目越薄弱；某天没答到该科目则无数据点。';
+  const tb = document.querySelector('#wtable tbody');
+  tb.innerHTML = '';
+  (st.weak || []).forEach(w => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${w.subject}</td><td>${w.stem}</td><td>${w.total}</td><td>${w.total - w.ok}</td><td>${Math.round(100 * w.ok / w.total)}%</td>`;
+    tb.appendChild(tr);
+  });
+  $('weakEmpty').textContent = rows.length ? '' : '还没有答题记录，孩子在电视上答题后这里会自动生成折线图和薄弱题清单。';
+}
+
+function drawChart(days, subjects, byS) {
+  const cv = $('chart'), ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 42, padR = 14, padT = 34, padB = 40;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  ctx.font = '12px "PingFang SC", sans-serif';
+  // 网格与纵轴
+  ctx.lineWidth = 1;
+  for (let v = 0; v <= 100; v += 25) {
+    const y = padT + plotH * (1 - v / 100);
+    ctx.strokeStyle = '#eee';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillStyle = '#888'; ctx.textAlign = 'right';
+    ctx.fillText(v + '%', padL - 6, y + 4);
+  }
+  // 横轴日期（点多时隔天显示）
+  const step = Math.max(1, Math.ceil(days.length / 8));
+  ctx.textAlign = 'center'; ctx.fillStyle = '#888';
+  days.forEach((d, i) => {
+    if (i % step) return;
+    const x = padL + plotW * (days.length === 1 ? 0.5 : i / (days.length - 1));
+    ctx.fillText(d.slice(5), x, H - padB + 16);
+  });
+  // 各科目折线（只连接有数据的日子）
+  subjects.forEach(s => {
+    const pts = [];
+    days.forEach((d, i) => {
+      const m = byS[s][d];
+      if (m) pts.push({
+        x: padL + plotW * (days.length === 1 ? 0.5 : i / (days.length - 1)),
+        y: padT + plotH * (1 - m.ok / m.total)
+      });
+    });
+    if (!pts.length) return;
+    ctx.strokeStyle = colorOf(s); ctx.fillStyle = colorOf(s); ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.stroke();
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, 7); ctx.fill(); });
+  });
+  // 图例
+  let lx = padL;
+  ctx.textAlign = 'left';
+  subjects.forEach(s => {
+    ctx.fillStyle = colorOf(s);
+    ctx.fillRect(lx, 10, 12, 12);
+    ctx.fillStyle = '#444';
+    ctx.fillText(s, lx + 16, 20);
+    lx += 16 + ctx.measureText(s).width + 18;
+  });
+}
+
+refreshStatus(); loadConfig(); loadQuestions(); loadStats();
 </script>
 </body>
 </html>

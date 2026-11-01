@@ -47,6 +47,8 @@ public class AdminServer extends NanoHTTPD {
                 if (session.getMethod() == Method.POST) {
                     Question q = Question.fromJson(new JSONObject(body(session)));
                     q.id = 0;
+                    if (q.grade < 1 || q.grade > 6) q.grade = Prefs.kidGrade(ctx);
+                    if (q.term < 1 || q.term > 2) q.term = Prefs.kidTerm(ctx);
                     long id = Db.get(ctx).addQuestion(q);
                     return json(new JSONObject().put("ok", true).put("id", id));
                 }
@@ -66,8 +68,15 @@ public class AdminServer extends NanoHTTPD {
             }
             if ("/api/import".equals(uri) && session.getMethod() == Method.POST) {
                 JSONObject b = new JSONObject(body(session));
-                int n = Db.get(ctx).importJson(b.optString("json", "{}"));
+                int n = Db.get(ctx).importJson(b.optString("json", "{}"),
+                        Prefs.kidGrade(ctx), Prefs.kidTerm(ctx));
                 return json(new JSONObject().put("ok", true).put("imported", n));
+            }
+            if ("/api/stats".equals(uri)) {
+                JSONObject o = new JSONObject();
+                o.put("rows", Db.get(ctx).statsBySubject(14));
+                o.put("weak", Db.get(ctx).weakQuestions(10));
+                return json(o);
             }
             if ("/api/config".equals(uri)) {
                 if (session.getMethod() == Method.GET) return json(config());
@@ -81,6 +90,8 @@ public class AdminServer extends NanoHTTPD {
                     String seq = b.getString("parentSeq").toUpperCase().replaceAll("[^UDLR]", "");
                     if (seq.length() >= 4) Prefs.setParentSeq(ctx, seq);
                 }
+                if (b.has("kidGrade")) Prefs.setKidGrade(ctx, b.getInt("kidGrade"));
+                if (b.has("kidTerm")) Prefs.setKidTerm(ctx, b.getInt("kidTerm"));
                 if (b.optBoolean("watchMonitorEnabled")) WatchMonitorService.start(ctx);
                 return json(new JSONObject().put("ok", true));
             }
@@ -122,15 +133,20 @@ public class AdminServer extends NanoHTTPD {
         o.put("watchMonitorEnabled", Prefs.watchMonitorEnabled(ctx));
         o.put("videoApps", Prefs.videoApps(ctx));
         o.put("parentSeq", Prefs.parentSeq(ctx));
+        o.put("kidGrade", Prefs.kidGrade(ctx));
+        o.put("kidTerm", Prefs.kidTerm(ctx));
         return o;
     }
 
+    /** 直接按 UTF-8 读取原始请求体（绕过 NanoHTTPD 的 ISO-8859-1 解码，避免中文乱码） */
     private String body(IHTTPSession session) {
         try {
-            Map<String, String> files = new HashMap<>();
-            session.parseBody(files);
-            String post = files.get("postData");
-            return post == null ? "" : post;
+            String lenHeader = session.getHeaders().get("content-length");
+            if (lenHeader == null) return "";
+            byte[] buf = new byte[Integer.parseInt(lenHeader.trim())];
+            java.io.DataInputStream in = new java.io.DataInputStream(session.getInputStream());
+            in.readFully(buf);
+            return new String(buf, java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception e) {
             return "";
         }

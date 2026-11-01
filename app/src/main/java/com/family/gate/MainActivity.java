@@ -111,22 +111,9 @@ public class MainActivity extends Activity {
                 + "\n题库题目数：" + Db.get(this).countEnabled()
                 + "\n开机答题数：" + Prefs.bootQuestions(this) + " 题"
                 + "\n弹题间隔：" + Prefs.quizIntervalMin(this) + " 分钟"
-                + "\n家长方向密码：" + seqToText(Prefs.parentSeq(this))
+                + "\n家长方向密码：已设置（内容不在此显示，家长请查看纸质/本地手册或管理页）"
                 + "\n\n家长解锁：门禁界面长按 OK 键 3 秒 → 输入方向密码 → 选择放行时长";
         statusText.setText(s);
-    }
-
-    private String seqToText(String seq) {
-        StringBuilder sb = new StringBuilder();
-        for (char c : seq.toCharArray()) {
-            switch (c) {
-                case 'U': sb.append("上"); break;
-                case 'D': sb.append("下"); break;
-                case 'L': sb.append("左"); break;
-                case 'R': sb.append("右"); break;
-            }
-        }
-        return sb.toString();
     }
 
     private int dp(int v) {
