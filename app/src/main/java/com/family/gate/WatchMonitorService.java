@@ -24,11 +24,17 @@ public class WatchMonitorService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int watchedSec = 0;
     private boolean running = false;
+    private long lastTickAt = 0;
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!running) return;
-            check();
+            // 用真实流逝时间计时：电视高负载时任务延迟数分钟也能正确累计
+            long now = android.os.SystemClock.elapsedRealtime();
+            long deltaSec = lastTickAt == 0 ? 0
+                    : Math.min((now - lastTickAt) / 1000, 300);
+            lastTickAt = now;
+            check((int) deltaSec);
             handler.postDelayed(this, CHECK_INTERVAL_MS);
         }
     };
@@ -75,7 +81,7 @@ public class WatchMonitorService extends Service {
         super.onDestroy();
     }
 
-    private void check() {
+    private void check(int deltaSec) {
         if (!Prefs.gateEnabled(this)) { diag("跳过: 总开关关"); return; }
         if (GateService.showing)     { diag("跳过: 答题弹窗中"); return; }
         if (Prefs.isUnlockedNow(this)) { diag("跳过: 家长放行期至 "
@@ -87,9 +93,9 @@ public class WatchMonitorService extends Service {
         boolean inList = fg != null && Prefs.containsVideoApp(this, fg);
         if (!inList) { diag("前台=" + fg + " 不在名单, 已计 " + watchedSec + "s"); return; }
 
-        watchedSec += (int) (CHECK_INTERVAL_MS / 1000);
+        watchedSec += deltaSec;
         int limitSec = Prefs.quizIntervalMin(this) * 60;
-        diag("计时中 前台=" + fg + " " + watchedSec + "/" + limitSec + "s");
+        diag("计时中 前台=" + fg + " +" + deltaSec + "s, 累计 " + watchedSec + "/" + limitSec + "s");
         if (watchedSec >= limitSec) {
             watchedSec = 0;
             if (!GateService.showing) {
