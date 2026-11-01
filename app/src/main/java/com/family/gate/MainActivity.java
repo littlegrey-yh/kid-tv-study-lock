@@ -112,6 +112,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (AdminReceiver.isActiveOwner(this)) AdminReceiver.blockUninstall(this); // 保险：确保禁卸在位
         refreshStatus();
     }
 
@@ -133,6 +134,7 @@ public class MainActivity extends Activity {
                 + "\n开机弹答题：" + (Prefs.bootQuizEnabled(this) ? "已开启" : "已关闭（默认关，管理页可开）")
                 + "\n观看监控：" + (Prefs.watchMonitorEnabled(this) ? "已开启（每 "
                         + Prefs.quizIntervalMin(this) + " 分钟弹题）" : "已关闭")
+                + "\n防卸载：" + (AdminReceiver.isActiveOwner(this) ? "✓ 已激活（系统无法卸载本应用）" : "未激活")
                 + "\n题库题目数：" + Db.get(this).countEnabled()
                 + "\n家长方向密码：已设置（内容不在此显示，家长请查看纸质/本地手册或管理页）"
                 + "\n\n家长解锁：门禁界面长按 OK 键 3 秒 → 输入方向密码 → 选择放行时长"

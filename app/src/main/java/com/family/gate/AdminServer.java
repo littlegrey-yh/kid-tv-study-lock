@@ -100,6 +100,19 @@ public class AdminServer extends NanoHTTPD {
                 Db.get(ctx).clearAttempts();
                 return json(new JSONObject().put("ok", true));
             }
+            if ("/api/owner/clear".equals(uri) && session.getMethod() == Method.POST) {
+                // 解除防卸载：必须先解禁再清除 owner（不可逆操作，管理页有确认弹窗）
+                android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager)
+                        ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
+                android.content.ComponentName admin = new android.content.ComponentName(
+                        ctx, com.family.gate.AdminReceiver.class);
+                if (dpm != null && dpm.isDeviceOwnerApp(ctx.getPackageName())) {
+                    dpm.setUninstallBlocked(admin, ctx.getPackageName(), false);
+                    dpm.clearDeviceOwnerApp(ctx.getPackageName());
+                    return json(new JSONObject().put("ok", true));
+                }
+                return json(new JSONObject().put("ok", false).put("error", "当前不是 device owner"));
+            }
             if ("/api/config".equals(uri)) {
                 if (session.getMethod() == Method.GET) return json(config());
                 JSONObject b = new JSONObject(body(session));
