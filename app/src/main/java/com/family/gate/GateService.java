@@ -10,10 +10,12 @@ import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -135,6 +137,20 @@ public class GateService extends Service {
         wm.addView(root, p);
         showing = true;
         root.post(new Runnable() { @Override public void run() { root.requestFocus(); } });
+        sendMediaKey(KeyEvent.KEYCODE_MEDIA_PAUSE); // 弹题时暂停视频
+    }
+
+    /** 模拟遥控器媒体键：弹题暂停 / 放行播放（无需特殊权限，主流 TV App 均响应） */
+    private void sendMediaKey(int code) {
+        try {
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am == null) return;
+            am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, code));
+            am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, code));
+            android.util.Log.i("LearningGate", "media key " + (code == KeyEvent.KEYCODE_MEDIA_PAUSE ? "PAUSE" : "PLAY"));
+        } catch (Exception e) {
+            android.util.Log.i("LearningGate", "media key failed: " + e);
+        }
     }
 
     private void hideOverlay() {
@@ -352,7 +368,11 @@ public class GateService extends Service {
             case KeyEvent.KEYCODE_ENTER:
                 boolean done = engine.submit(Db.get(this), q.letterOf(sel));
                 if (done) {
-                    unlock(30); // 全部答对：放行 30 分钟，监控计时重新累计
+                    // 答对即放行继续观看，不放时长：监控立即重新计时，到点再次弹题
+                    Log.i("LearningGate", "答题全部通过，继续观看");
+                    hideOverlay();
+                    sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY);
+                    stopSelf();
                     return;
                 }
                 break;
@@ -453,6 +473,7 @@ public class GateService extends Service {
         Prefs.setUnlockUntil(this,
                 System.currentTimeMillis() + minutes * 60000L);
         hideOverlay();
+        sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY);
         stopSelf();
     }
 
