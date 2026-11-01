@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学习门禁 · 管理页</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; color: #222; }
+  h1 { font-size: 22px; } h2 { font-size: 17px; margin-top: 28px; border-left: 4px solid #0F6E56; padding-left: 8px; }
+  label { display: block; margin-top: 10px; font-size: 14px; color: #444; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+  button { padding: 8px 16px; margin-top: 10px; margin-right: 8px; font-size: 14px; border: 0; border-radius: 6px; background: #0F6E56; color: #fff; cursor: pointer; }
+  button.gray { background: #888; } button.red { background: #A32D2D; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  td, th { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; vertical-align: top; }
+  .row { display: flex; gap: 10px; } .row > * { flex: 1; }
+  .msg { margin-top: 8px; font-size: 13px; color: #0F6E56; min-height: 18px; }
+  .tag { font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>学习门禁 · 管理页</h1>
+<p class="tag">与电视同一 Wi-Fi 下访问。所有数据只保存在电视本地。</p>
+<div id="status" class="msg"></div>
+
+<h2>远程解锁</h2>
+<label>家长方向密码（U=上 D=下 L=左 R=右，默认 UDUDLRLR）</label>
+<input id="unlockSeq" placeholder="UDUDLRLR">
+<div>
+  <button onclick="unlock(30)">放行30分钟</button>
+  <button onclick="unlock(60)">放行1小时</button>
+  <button onclick="unlock(120)">放行2小时</button>
+</div>
+<div id="unlockMsg" class="msg"></div>
+
+<h2>设置</h2>
+<div class="row">
+  <div><label>门禁总开关</label><select id="gateEnabled"><option value="true">开启</option><option value="false">关闭</option></select></div>
+  <div><label>开机答题数（答对几题放行）</label><select id="bootQuestions"><option>3</option><option>5</option><option>10</option></select></div>
+  <div><label>弹题间隔（分钟）</label><select id="quizIntervalMin"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
+</div>
+<label>观看监控（每满弹题间隔弹出答题，v0.8 完整支持）</label>
+<select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select>
+<label>家长方向密码（4-12位，U/D/L/R 组合，改完遥控器输入也随之变化）</label>
+<input id="parentSeq" placeholder="UDUDLRLR">
+<label>视频类应用包名（逗号分隔，命中即计时弹题）</label>
+<textarea id="videoApps" rows="3"></textarea>
+<button onclick="saveConfig()">保存设置</button>
+<div id="cfgMsg" class="msg"></div>
+
+<h2>添加题目</h2>
+<div class="row">
+  <div><label>科目</label><input id="subject" placeholder="语文/数学/英语..."></div>
+  <div><label>难度</label><select id="difficulty"><option value="1">易</option><option value="2" selected>中</option><option value="3">难</option></select></div>
+  <div><label>答案</label><select id="answer"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+</div>
+<label>题干</label><textarea id="stem" rows="2"></textarea>
+<div class="row">
+  <div><label>选项A</label><input id="optA"></div>
+  <div><label>选项B</label><input id="optB"></div>
+</div>
+<div class="row">
+  <div><label>选项C（可空）</label><input id="optC"></div>
+  <div><label>选项D（可空）</label><input id="optD"></div>
+</div>
+<label>解析（可选）</label><input id="explanation">
+<button onclick="addQuestion()">添加题目</button>
+<div id="addMsg" class="msg"></div>
+
+<h2>批量导入 / 导出</h2>
+<label>粘贴 JSON 数组（字段同单题）后点导入</label>
+<textarea id="importBox" rows="4" placeholder='[{"subject":"数学","stem":"3+5=?","optA":"6","optB":"7","optC":"8","optD":"9","answer":"C"}]'></textarea>
+<button onclick="importJson()">导入</button>
+<button class="gray" onclick="exportJson()">导出全部题目</button>
+<div id="ioMsg" class="msg"></div>
+
+<h2>题库（<span id="count">0</span> 题）</h2>
+<table id="qtable"><thead><tr><th>科目</th><th>题干</th><th>答案</th><th>启用</th><th></th></tr></thead><tbody></tbody></table>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function api(path, body) {
+  const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {};
+  const r = await fetch(path, opt);
+  return r.json();
+}
+
+async function refreshStatus() {
+  try {
+    const s = await api('/api/status');
+    $('status').textContent = `门禁：${s.gateEnabled ? '已开启' : '未开启'} · 题库 ${s.count} 题 · 版本 v${s.version}`;
+    $('count').textContent = s.count;
+  } catch(e) { $('status').textContent = '无法连接电视，请确认手机与电视在同一 Wi-Fi。'; }
+}
+
+async function loadConfig() {
+  const c = await api('/api/config');
+  $('gateEnabled').value = String(c.gateEnabled);
+  $('bootQuestions').value = String(c.bootQuestions);
+  $('quizIntervalMin').value = String(c.quizIntervalMin);
+  $('watchMonitorEnabled').value = String(c.watchMonitorEnabled);
+  $('parentSeq').value = c.parentSeq;
+  $('videoApps').value = c.videoApps;
+}
+
+async function saveConfig() {
+  const r = await api('/api/config', {
+    gateEnabled: $('gateEnabled').value === 'true',
+    bootQuestions: parseInt($('bootQuestions').value),
+    quizIntervalMin: parseInt($('quizIntervalMin').value),
+    watchMonitorEnabled: $('watchMonitorEnabled').value === 'true',
+    parentSeq: $('parentSeq').value.trim(),
+    videoApps: $('videoApps').value.trim()
+  });
+  $('cfgMsg').textContent = r.ok ? '已保存。' : ('保存失败：' + r.error);
+  refreshStatus();
+}
+
+async function addQuestion() {
+  if (!$('stem').value.trim()) { $('addMsg').textContent = '题干不能为空'; return; }
+  const r = await api('/api/questions', {
+    subject: $('subject').value.trim() || '通用',
+    difficulty: parseInt($('difficulty').value),
+    stem: $('stem').value.trim(),
+    optA: $('optA').value.trim(), optB: $('optB').value.trim(),
+    optC: $('optC').value.trim() || null, optD: $('optD').value.trim() || null,
+    answer: $('answer').value,
+    explanation: $('explanation').value.trim(), enabled: true
+  });
+  $('addMsg').textContent = r.ok ? `已添加（id=${r.id}）` : '添加失败';
+  ['stem','optA','optB','optC','optD','explanation'].forEach(i => $(i).value = '');
+  loadQuestions(); refreshStatus();
+}
+
+async function loadQuestions() {
+  const data = await api('/api/questions');
+  const tb = document.querySelector('#qtable tbody');
+  tb.innerHTML = '';
+  (data.questions || []).forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${q.subject}</td><td>${q.stem}</td><td>${q.answer}</td>
+      <td><button class="gray" onclick="toggle(${q.id},${!q.enabled})">${q.enabled ? '停用' : '启用'}</button></td>
+      <td><button class="red" onclick="del(${q.id})">删除</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function del(id)        { await api('/api/questions/delete', {id}); loadQuestions(); refreshStatus(); }
+async function toggle(id, en) { await api('/api/questions/enable', {id, enabled: en}); loadQuestions(); }
+
+async function importJson() {
+  const r = await api('/api/import', {json: $('importBox').value});
+  $('ioMsg').textContent = r.ok ? `导入 ${r.imported} 题` : ('导入失败：' + r.error);
+  loadQuestions(); refreshStatus();
+}
+
+async function exportJson() {
+  const data = await api('/api/export');
+  $('importBox').value = JSON.stringify(data, null, 2);
+  $('ioMsg').textContent = '已导出到下方文本框，可复制保存。';
+}
+
+async function unlock(minutes) {
+  const r = await api('/api/unlock', {seq: $('unlockSeq').value.trim(), minutes});
+  $('unlockMsg').textContent = r.ok ? `电视已放行 ${minutes} 分钟。` : (r.error || '解锁失败');
+}
+
+refreshStatus(); loadConfig(); loadQuestions();
+</script>
+</body>
+</html>
