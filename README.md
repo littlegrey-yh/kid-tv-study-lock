@@ -1,4 +1,4 @@
-# 学习门禁（LearningGate）
+# 学习门禁（kid-tv-study-lock）
 
 Android TV 学习门禁应用：孩子开机先答题、看视频每满一段时间弹题，答错追加题，全部答对才能继续。家长凭方向密码随时放行。
 
@@ -16,7 +16,7 @@ Android TV 学习门禁应用：孩子开机先答题、看视频每满一段时
 ## 构建（GitHub Actions 云编译，本机无需任何环境）
 
 1. 在 GitHub 新建仓库，把 `learning-gate/` 目录内容推送上去
-2. 打开仓库 **Actions** 页 → 等待 "Build APK" 跑完 → 下载 artifact `learning-gate-apk`
+2. 打开仓库 **Actions** 页 → 等待 "Build APK" 跑完 → 下载 artifact `kid-tv-study-lock-apk`
 3. 得到 `app-debug.apk`
 
 ## 安装到雷鸟电视
@@ -40,7 +40,7 @@ Android TV 学习门禁应用：孩子开机先答题、看视频每满一段时
 ## 目录结构
 
 ```
-learning-gate/
+kid-tv-study-lock/
 ├── app/src/main/java/com/family/gate/
 │   ├── GateApp.java              # 应用入口：管理服务 + 监控 + 门禁兜底
 │   ├── GateService.java          # 核心：全屏悬浮窗答题/家长解锁

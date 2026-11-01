@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "LearningGate"
+rootProject.name = "kid-tv-study-lock"
 include ':app'
