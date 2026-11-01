@@ -12,12 +12,14 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(final Context context, Intent intent) {
         String action = intent == null ? null : intent.getAction();
+        android.util.Log.d("LearningGate", "BootReceiver received action=" + action);
         if (action == null) return;
         if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
                 && !"android.intent.action.QUICKBOOT_POWERON".equals(action)) return;
 
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override public void run() {
+                android.util.Log.d("LearningGate", "BootReceiver firing maybeShowGate");
                 GateApp.maybeShowGate(context);
             }
         }, 8000);

@@ -249,7 +249,8 @@ public class GateService extends Service {
             progressText.setText("本轮剩余 " + (engine == null ? 0 : engine.remaining())
                     + " 题 · 已答错 " + (engine == null ? 0 : engine.wrongCount) + " 题");
             if (q == null) { hideOverlay(); stopSelf(); return; }
-            stemText.setText(gradeLabel(q.grade, q.term) + " " + q.subject + "｜" + q.stem);
+            String gl = gradeLabel(q.grade, q.term);
+            stemText.setText((gl.isEmpty() ? "" : gl + "｜") + q.subject + "｜" + q.stem);
             String[] opts = {q.optA, q.optB, q.optC, q.optD};
             int visible = 0;
             for (int i = 0; i < 4; i++) {

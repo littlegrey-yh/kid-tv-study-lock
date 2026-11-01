@@ -29,7 +29,7 @@
 <div id="lockScreen" style="position:fixed; inset:0; background:rgba(20,24,31,.96); z-index:99; align-items:center; justify-content:center;">
   <div style="background:#fff; padding:28px; border-radius:12px; width:min(360px, 90vw);">
     <h2 style="margin:0 0 4px; border:0; padding:0;">管理页已锁定</h2>
-    <p class="tag">请输入管理密码（默认 0000，登录后请到"设置"里修改）</p>
+    <p class="tag">请输入管理密码。首次使用默认密码见《家长手册》，登录后请在"设置"里修改。</p>
     <input id="loginPass" type="password" placeholder="管理密码" onkeydown="if(event.key==='Enter')doLogin()">
     <button onclick="doLogin()" style="width:100%">登录</button>
     <div id="loginMsg" class="msg"></div>
@@ -104,14 +104,16 @@
 </h2>
 <canvas id="chart" width="840" height="300" style="width:100%; border:1px solid #eee; border-radius:8px; background:#fff;"></canvas>
 <div id="chartLegend" class="tag" style="margin-top:6px;"></div>
-<h3 style="font-size:15px; margin-top:20px;">错得最多的题（Top 10）</h3>
+<h3 style="font-size:15px; margin-top:20px;">错得最多的题（Top 50）</h3>
 <table id="wtable"><thead><tr><th>科目</th><th>题干</th><th>答题次数</th><th>错误次数</th><th>正确率</th></tr></thead><tbody></tbody></table>
+<div id="wPager" style="margin-top:8px;"></div>
 <div id="weakEmpty" class="msg"></div>
 
 <h2>题库（<span id="count">0</span> 题）
   <button class="red" style="margin:0 0 0 10px; padding:4px 12px; font-size:12px; vertical-align:middle;" onclick="clearAll()">清空题库</button>
 </h2>
 <table id="qtable"><thead><tr><th>科目</th><th>年级</th><th>题干</th><th>答案</th><th>启用</th><th></th></tr></thead><tbody></tbody></table>
+<div id="qPager" style="margin-top:8px;"></div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -227,11 +229,55 @@ async function addQuestion() {
   loadQuestions(); refreshStatus();
 }
 
+// ---- 分页（题库 / 薄弱题清单共用） ----
+const qState = { all: [], page: 1, size: 20 };
+const wState = { all: [], page: 1, size: 10 };
+
+function renderPager(el, st, redraw) {
+  const total = st.all.length;
+  const pages = Math.max(1, Math.ceil(total / st.size));
+  if (st.page > pages) st.page = pages;
+  if (st.page < 1) st.page = 1;
+  el.innerHTML = '';
+  const info = document.createElement('span');
+  info.className = 'tag';
+  info.textContent = `共 ${total} 条 · 第 ${st.page}/${pages} 页 · 每页 `;
+  el.appendChild(info);
+  const sel = document.createElement('select');
+  sel.style.cssText = 'width:auto; display:inline-block; padding:2px 6px; font-size:12px;';
+  [10, 20, 50, 100].forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    if (n === st.size) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => { st.size = parseInt(sel.value); st.page = 1; redraw(); };
+  el.appendChild(sel);
+  const mk = (label, p, dis) => {
+    const b = document.createElement('button');
+    b.className = 'gray';
+    b.style.cssText = 'margin:0 0 0 8px; padding:4px 12px; font-size:12px;';
+    b.textContent = label; b.disabled = dis;
+    b.onclick = () => { st.page = p; redraw(); };
+    el.appendChild(b);
+  };
+  mk('上一页', st.page - 1, st.page <= 1);
+  mk('下一页', st.page + 1, st.page >= pages);
+}
+
 async function loadQuestions() {
   const data = await api('/api/questions');
+  qState.all = data.questions || [];
+  qState.page = 1;
+  renderQuestions();
+}
+
+function renderQuestions() {
+  renderPager($('qPager'), qState, renderQuestions);
   const tb = document.querySelector('#qtable tbody');
   tb.innerHTML = '';
-  (data.questions || []).forEach(q => {
+  const start = (qState.page - 1) * qState.size;
+  qState.all.slice(start, start + qState.size).forEach(q => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${q.subject}</td><td>${GRADE_NAMES[q.grade + '-' + q.term] || (q.grade + '上')}</td><td>${q.stem}</td><td>${q.answer}</td>
       <td><button class="gray" onclick="toggle(${q.id},${!q.enabled})">${q.enabled ? '停用' : '启用'}</button></td>
@@ -291,14 +337,22 @@ async function loadStats() {
   });
   drawChart(days, subjects, byS);
   $('chartLegend').textContent = '纵轴为当日正确率（答对/答题次数），线越低说明该科目越薄弱；某天没答到该科目则无数据点。';
+  wState.all = st.weak || [];
+  wState.page = 1;
+  renderWeak();
+  $('weakEmpty').textContent = rows.length ? '' : '还没有答题记录，孩子在电视上答题后这里会自动生成折线图和薄弱题清单。';
+}
+
+function renderWeak() {
+  renderPager($('wPager'), wState, renderWeak);
   const tb = document.querySelector('#wtable tbody');
   tb.innerHTML = '';
-  (st.weak || []).forEach(w => {
+  const start = (wState.page - 1) * wState.size;
+  wState.all.slice(start, start + wState.size).forEach(w => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${w.subject}</td><td>${w.stem}</td><td>${w.total}</td><td>${w.total - w.ok}</td><td>${Math.round(100 * w.ok / w.total)}%</td>`;
     tb.appendChild(tr);
   });
-  $('weakEmpty').textContent = rows.length ? '' : '还没有答题记录，孩子在电视上答题后这里会自动生成折线图和薄弱题清单。';
 }
 
 function drawChart(days, subjects, byS) {

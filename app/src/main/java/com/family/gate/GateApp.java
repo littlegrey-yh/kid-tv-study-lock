@@ -22,11 +22,16 @@ public class GateApp extends Application {
 
     /** 满足条件才弹门禁：开关已开 + 不在家长放行期 + 题库非空 */
     public static void maybeShowGate(android.content.Context ctx) {
-        if (!Prefs.gateEnabled(ctx)) return;
-        if (Prefs.isUnlockedNow(ctx)) return;
-        if (GateService.showing) return;
-        if (Db.get(ctx).countEnabled() == 0) return;
+        if (!Prefs.gateEnabled(ctx)) { log("gate off, skip"); return; }
+        if (Prefs.isUnlockedNow(ctx)) { log("parent unlocked, skip"); return; }
+        if (GateService.showing) { log("already showing, skip"); return; }
+        if (Db.get(ctx).countEnabled() == 0) { log("empty bank, skip"); return; }
+        log("showing boot gate");
         GateService.show(ctx, true);
+    }
+
+    private static void log(String msg) {
+        android.util.Log.d("LearningGate", msg);
     }
 
     private void startAdminServer() {

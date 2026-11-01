@@ -93,7 +93,7 @@ public class AdminServer extends NanoHTTPD {
             if ("/api/stats".equals(uri)) {
                 JSONObject o = new JSONObject();
                 o.put("rows", Db.get(ctx).statsBySubject(14));
-                o.put("weak", Db.get(ctx).weakQuestions(10));
+                o.put("weak", Db.get(ctx).weakQuestions(50));
                 return json(o);
             }
             if ("/api/attempts/clear".equals(uri) && session.getMethod() == Method.POST) {

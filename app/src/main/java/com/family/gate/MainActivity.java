@@ -23,6 +23,7 @@ import java.util.Enumeration;
 public class MainActivity extends Activity {
 
     private TextView statusText;
+    private Button btnOverlay, btnUsage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,20 +47,22 @@ public class MainActivity extends Activity {
         statusText.setPadding(0, dp(24), 0, 0);
         root.addView(statusText);
 
-        root.addView(button("① 授予悬浮窗权限（必须）", new View.OnClickListener() {
+        btnOverlay = button("", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName())));
             }
-        }));
+        });
+        root.addView(btnOverlay);
 
-        root.addView(button("② 授予使用情况访问权限（观看计时用）", new View.OnClickListener() {
+        btnUsage = button("", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 try {
                     startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
                 } catch (Exception ignored) { }
             }
-        }));
+        });
+        root.addView(btnUsage);
 
         root.addView(button("③ 测试：立即弹出答题门禁", new View.OnClickListener() {
             @Override public void onClick(View v) {
@@ -104,6 +107,16 @@ public class MainActivity extends Activity {
     }
 
     private void refreshStatus() {
+        // 权限按钮显示实时状态
+        boolean overlay = Settings.canDrawOverlays(this);
+        boolean usage = hasUsageAccess();
+        btnOverlay.setText(overlay
+                ? "① 悬浮窗权限：✓ 已授予（点击可重新设置）"
+                : "① 授权悬浮窗权限（必须，未授予）");
+        btnUsage.setText(usage
+                ? "② 使用情况访问权限：✓ 已授予（观看计时用）"
+                : "② 授权使用情况访问权限（选做，观看计时弹题才需要）");
+
         String ip = localIp();
         String url = ip == null ? "（电视未联网）" : "http://" + ip + ":8765";
         String s = "管理页地址（手机浏览器打开）：" + url
@@ -112,8 +125,23 @@ public class MainActivity extends Activity {
                 + "\n开机答题数：" + Prefs.bootQuestions(this) + " 题"
                 + "\n弹题间隔：" + Prefs.quizIntervalMin(this) + " 分钟"
                 + "\n家长方向密码：已设置（内容不在此显示，家长请查看纸质/本地手册或管理页）"
-                + "\n\n家长解锁：门禁界面长按 OK 键 3 秒 → 输入方向密码 → 选择放行时长";
+                + "\n\n家长解锁：门禁界面长按 OK 键 3 秒 → 输入方向密码 → 选择放行时长"
+                + "\n\n说明：②使用情况权限只在开启\"观看监控\"（每满10分钟弹题）时用，"
+                + "用于识别前台是不是视频应用；只做开机门禁可以不授。";
         statusText.setText(s);
+    }
+
+    private boolean hasUsageAccess() {
+        try {
+            android.app.AppOpsManager ops =
+                    (android.app.AppOpsManager) getSystemService(APP_OPS_SERVICE);
+            if (ops == null) return false;
+            int mode = ops.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    android.os.Process.myUid(), getPackageName());
+            return mode == android.app.AppOpsManager.MODE_ALLOWED;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private int dp(int v) {
