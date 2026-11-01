@@ -203,7 +203,7 @@ public class GateService extends Service {
         pinDots = makeText("", 30, Color.parseColor("#9FE1CB"), true);
         pinDots.setGravity(Gravity.CENTER);
         pinPanel.addView(pinDots, lp(40));
-        pinPanel.addView(makeText("用遥控器方向键输入（错误自动清空重来）", 15,
+        pinPanel.addView(makeText("用遥控器方向键输入（输错自动清空；按返回键退回答题）", 15,
                 Color.parseColor("#88FFFFFF"), false), lp(20));
 
         // 放行时长面板
@@ -219,6 +219,8 @@ public class GateService extends Service {
             o.setPadding(dp(24), dp(14), dp(24), dp(14));
             durationPanel.addView(o, lp(16));
         }
+        durationPanel.addView(makeText("↑↓ 选择 · OK 确认 · 返回键取消", 15,
+                Color.parseColor("#88FFFFFF"), false), lp(20));
 
         root.addView(quizPanel);
         root.addView(pinPanel);
@@ -278,8 +280,17 @@ public class GateService extends Service {
                     || keyCode == KeyEvent.KEYCODE_ENTER;
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() > 0) return true; // 忽略长按连发，防止串键
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    // 返回键：退出家长解锁流程，回到答题界面（防卡死逃生通道）
+                    if (mode != MODE_QUIZ) {
+                        mode = MODE_QUIZ;
+                        pinInput.setLength(0);
+                        applyMode();
+                    }
+                    return true;
+                }
                 if (ok) {
-                    // OK 按下：启动 3 秒长按计时；提交动作在抬起时判断
+                    // OK 按下：启动 3 秒长按计时；提交动作在抬起时按当前模式分发
                     okDown = true;
                     okLongFired = false;
                     handler.postDelayed(longPressRunnable, 3000);
@@ -293,13 +304,14 @@ public class GateService extends Service {
                 return true;
             } else if (event.getAction() == KeyEvent.ACTION_UP && ok) {
                 handler.removeCallbacks(longPressRunnable);
-                if (okDown && !okLongFired && mode == MODE_QUIZ) {
-                    // 短按 OK：提交当前选项
-                    okDown = false;
-                    handleQuizKey(keyCode);
-                    return true;
-                }
+                boolean shortPress = okDown && !okLongFired;
                 okDown = false;
+                if (shortPress) {
+                    // 短按 OK：按当前模式分发提交动作
+                    if (mode == MODE_QUIZ) handleQuizKey(keyCode);
+                    else if (mode == MODE_DURATION) handleDurationKey(keyCode);
+                    // MODE_PIN 下 OK 无作用（只用方向键）
+                }
                 return true;
             }
             return true; // 悬浮窗内吞掉所有按键，防止逃逸
@@ -338,7 +350,17 @@ public class GateService extends Service {
             pinInput.setLength(0);
             mode = MODE_DURATION;
             durationSel = 0;
+            applyMode(); // 切换到放行时长面板
+            return;
         }
+        render();
+    }
+
+    /** 按当前模式切换三个面板的可见性并刷新 */
+    private void applyMode() {
+        quizPanel.setVisibility(mode == MODE_QUIZ ? View.VISIBLE : View.GONE);
+        pinPanel.setVisibility(mode == MODE_PIN ? View.VISIBLE : View.GONE);
+        durationPanel.setVisibility(mode == MODE_DURATION ? View.VISIBLE : View.GONE);
         render();
     }
 
@@ -388,9 +410,7 @@ public class GateService extends Service {
         okDown = false;
         mode = MODE_PIN;
         pinInput.setLength(0);
-        quizPanel.setVisibility(View.GONE);
-        pinPanel.setVisibility(View.VISIBLE);
-        render();
+        applyMode();
     }
 
     // ================= 通知与静态入口 =================
