@@ -244,7 +244,7 @@ public class GateService extends Service {
             progressText.setText("本轮剩余 " + (engine == null ? 0 : engine.remaining())
                     + " 题 · 已答错 " + (engine == null ? 0 : engine.wrongCount) + " 题");
             if (q == null) { hideOverlay(); stopSelf(); return; }
-            stemText.setText(q.subject + "｜" + q.stem);
+            stemText.setText(gradeLabel(q.grade, q.term) + " " + q.subject + "｜" + q.stem);
             String[] opts = {q.optA, q.optB, q.optC, q.optD};
             int visible = 0;
             for (int i = 0; i < 4; i++) {
@@ -387,6 +387,14 @@ public class GateService extends Service {
                 return;
         }
         render();
+    }
+
+    private static final String[] CN_GRADE = {"", "一", "二", "三", "四", "五", "六"};
+
+    /** 年级学期标签：如 "三上"、"一下"；异常值返回空串 */
+    private String gradeLabel(int grade, int term) {
+        if (grade < 1 || grade > 6) return "";
+        return CN_GRADE[grade] + (term == 2 ? "下" : "上");
     }
 
     private String dirOf(int keyCode) {
