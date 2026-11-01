@@ -17,6 +17,8 @@
   .msg { margin-top: 8px; font-size: 13px; color: #0F6E56; min-height: 18px; }
   .tag { font-size: 12px; color: #888; }
   #lockScreen { display: none; }
+  .cfggroup { border: 1px solid #e4e9e7; border-radius: 10px; padding: 4px 14px 14px; margin-top: 14px; }
+  .cfgtitle { font-size: 14px; font-weight: 600; color: #0F6E56; margin: 10px 0 2px; }
 </style>
 </head>
 <body>
@@ -49,29 +51,53 @@
 <div id="unlockMsg" class="msg"></div>
 
 <h2>设置</h2>
-<div class="row">
-  <div><label>门禁总开关（关闭后所有弹题都不工作）</label><select id="gateEnabled"><option value="true">开启</option><option value="false">关闭</option></select></div>
-  <div><label>开机弹答题（默认关；雷鸟无开机广告，可不弹）</label><select id="bootQuizEnabled"><option value="true">开机弹</option><option value="false" selected>不弹</option></select></div>
-  <div><label>开机答题数（答对几题放行）</label><select id="bootQuestions"><option>3</option><option>5</option><option>10</option></select></div>
-  <div><label>观看弹题间隔（分钟）</label><select id="quizIntervalMin"><option>1</option><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></div>
+
+<div class="cfggroup"><div class="cfgtitle">① 开关</div>
+  <div class="row">
+    <div><label>门禁总开关（关闭后所有弹题都不工作）</label><select id="gateEnabled"><option value="true">开启</option><option value="false">关闭</option></select></div>
+    <div><label>开机弹答题（默认关；雷鸟无开机广告，可不弹）</label><select id="bootQuizEnabled"><option value="true">开机弹</option><option value="false" selected>不弹</option></select></div>
+    <div><label>观看监控（看视频每满间隔弹题，需总开关开启）</label><select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select></div>
+  </div>
 </div>
-<label>观看监控（观看视频每满间隔时间弹出答题，需总开关开启）</label>
-<select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select>
-<label>孩子当前年级（抽题范围 = 该年级及以前所有学年，如选"三年级上"则考一上~三上全部题目）</label>
-<select id="kidGradeTerm">
-  <option value="1-1">一年级上</option><option value="1-2">一年级下</option>
-  <option value="2-1">二年级上</option><option value="2-2">二年级下</option>
-  <option value="3-1">三年级上</option><option value="3-2">三年级下</option>
-  <option value="4-1">四年级上</option><option value="4-2">四年级下</option>
-  <option value="5-1">五年级上</option><option value="5-2">五年级下</option>
-  <option value="6-1">六年级上</option><option value="6-2">六年级下</option>
-</select>
-<label>家长方向密码（4-12位，U/D/L/R 组合；留空表示不修改，不回显）</label>
-<input id="parentSeq" placeholder="留空则不修改">
-<label>管理密码（≥4位，用于登录本管理页；留空表示不修改）</label>
-<input id="adminPass" placeholder="留空则不修改">
-<label>视频类应用包名（逗号分隔，命中即计时弹题）</label>
-<textarea id="videoApps" rows="3"></textarea>
+
+<div class="cfggroup"><div class="cfgtitle">② 开机门禁（开机弹答题开启时生效）</div>
+  <div class="row">
+    <div><label>开机答题数（答对几题放行进桌面）</label><select id="bootQuestions"><option>3</option><option>5</option><option>10</option></select></div>
+  </div>
+</div>
+
+<div class="cfggroup"><div class="cfgtitle">③ 观看弹题（观看监控开启时生效）</div>
+  <div class="row">
+    <div><label>弹题间隔（看满几分钟弹一次）</label><select id="quizIntervalMin"><option>1</option><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></div>
+    <div><label>观看答题数（每次弹出先答几题）</label><select id="watchQuizCount"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select></div>
+    <div><label>错误追加题数（每答错 1 题追加几道新题）</label><select id="wrongAddCount"><option>0</option><option>1</option><option value="2" selected>2</option><option>3</option><option>4</option><option>5</option></select></div>
+  </div>
+</div>
+
+<div class="cfggroup"><div class="cfgtitle">④ 孩子信息</div>
+  <label>孩子当前年级（抽题范围 = 该年级及以前所有学年，如选"三年级上"则考一上~三上全部题目）</label>
+  <select id="kidGradeTerm">
+    <option value="1-1">一年级上</option><option value="1-2">一年级下</option>
+    <option value="2-1">二年级上</option><option value="2-2">二年级下</option>
+    <option value="3-1">三年级上</option><option value="3-2">三年级下</option>
+    <option value="4-1">四年级上</option><option value="4-2">四年级下</option>
+    <option value="5-1">五年级上</option><option value="5-2">五年级下</option>
+    <option value="6-1">六年级上</option><option value="6-2">六年级下</option>
+  </select>
+</div>
+
+<div class="cfggroup"><div class="cfgtitle">⑤ 安全（两项密码改完立即生效，留空表示不修改）</div>
+  <div class="row">
+    <div><label>家长方向密码（4-12位，U/D/L/R 组合）</label><input id="parentSeq" placeholder="留空则不修改"></div>
+    <div><label>管理密码（≥4位，登录本管理页用）</label><input id="adminPass" placeholder="留空则不修改"></div>
+  </div>
+</div>
+
+<div class="cfggroup"><div class="cfgtitle">⑥ 计时名单</div>
+  <label>视频类应用包名（逗号分隔，命中才计时弹题；逗号是"包含"匹配）</label>
+  <textarea id="videoApps" rows="3"></textarea>
+</div>
+
 <button onclick="saveConfig()">保存设置</button>
 <div id="cfgMsg" class="msg"></div>
 
@@ -185,6 +211,8 @@ async function loadConfig() {
   $('bootQuizEnabled').value = String(c.bootQuizEnabled);
   $('bootQuestions').value = String(c.bootQuestions);
   $('quizIntervalMin').value = String(c.quizIntervalMin);
+  $('watchQuizCount').value = String(c.watchQuizCount);
+  $('wrongAddCount').value = String(c.wrongAddCount);
   $('watchMonitorEnabled').value = String(c.watchMonitorEnabled);
   $('parentSeq').value = '';   // 密码不回显，留空 = 不修改
   $('adminPass').value = '';
@@ -200,6 +228,8 @@ async function saveConfig() {
     bootQuizEnabled: $('bootQuizEnabled').value === 'true',
     bootQuestions: parseInt($('bootQuestions').value),
     quizIntervalMin: parseInt($('quizIntervalMin').value),
+    watchQuizCount: parseInt($('watchQuizCount').value),
+    wrongAddCount: parseInt($('wrongAddCount').value),
     watchMonitorEnabled: $('watchMonitorEnabled').value === 'true',
     kidGrade: parseInt(gt[0]),
     kidTerm: parseInt(gt[1]),

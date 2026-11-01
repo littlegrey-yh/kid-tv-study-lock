@@ -14,22 +14,28 @@ public class QuizEngine {
     private final List<Long> usedIds = new ArrayList<>();
     private final Db db;
     private final int maxGrade, maxTerm;
+    private final int wrongAdd;
     public int wrongCount = 0;
     public int answeredCount = 0;
     public final int initialCount;
 
-    private QuizEngine(Db db, List<Question> initial, int maxGrade, int maxTerm) {
+    private QuizEngine(Db db, List<Question> initial, int maxGrade, int maxTerm, int wrongAdd) {
         this.db = db;
         this.maxGrade = maxGrade;
         this.maxTerm = maxTerm;
+        this.wrongAdd = wrongAdd;
         queue.addAll(initial);
         initialCount = initial.size();
         for (Question q : initial) usedIds.add(q.id);
     }
 
-    /** 开启一轮 n 道题的答题（从年级池抽题） */
-    public static QuizEngine start(Db db, int n, int maxGrade, int maxTerm) {
-        return new QuizEngine(db, db.pickRandom(n, null, maxGrade, maxTerm), maxGrade, maxTerm);
+    /**
+     * 开启一轮 n 道题的答题（从年级池抽题）。
+     * @param wrongAdd 每答错一题追加的新题数
+     */
+    public static QuizEngine start(Db db, int n, int maxGrade, int maxTerm, int wrongAdd) {
+        return new QuizEngine(db, db.pickRandom(n, null, maxGrade, maxTerm),
+                maxGrade, maxTerm, wrongAdd);
     }
 
     public boolean isDone()      { return queue.isEmpty(); }
@@ -52,8 +58,8 @@ public class QuizEngine {
             wrongCount++;
             // 本题重新入队尾
             queue.add(q);
-            // 追加 2 道新题（年级池内题量不足时有多少补多少）
-            List<Question> extra = db.pickRandom(2, usedIds, maxGrade, maxTerm);
+            // 追加 wrongAdd 道新题（年级池内题量不足时有多少补多少）
+            List<Question> extra = db.pickRandom(wrongAdd, usedIds, maxGrade, maxTerm);
             for (Question e : extra) {
                 queue.add(e);
                 usedIds.add(e.id);

@@ -121,8 +121,9 @@ public class GateService extends Service {
         if (root != null) { render(); return; }
         boolean boot = ACTION_SHOW_BOOT.equals(action) || ACTION_SHOW_TEST.equals(action);
         engine = QuizEngine.start(Db.get(this),
-                boot ? Prefs.bootQuestions(this) : 3,
-                Prefs.kidGrade(this), Prefs.kidTerm(this));
+                boot ? Prefs.bootQuestions(this) : Prefs.watchQuizCount(this),
+                Prefs.kidGrade(this), Prefs.kidTerm(this),
+                Prefs.wrongAddCount(this));
         sel = 0;
         mode = MODE_QUIZ;
         buildUi(boot);

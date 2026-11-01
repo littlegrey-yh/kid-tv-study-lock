@@ -107,6 +107,8 @@ public class AdminServer extends NanoHTTPD {
                 if (b.has("bootQuizEnabled"))      Prefs.setBootQuizEnabled(ctx, b.getBoolean("bootQuizEnabled"));
                 if (b.has("bootQuestions"))        Prefs.setBootQuestions(ctx, b.getInt("bootQuestions"));
                 if (b.has("quizIntervalMin"))      Prefs.setQuizIntervalMin(ctx, b.getInt("quizIntervalMin"));
+                if (b.has("watchQuizCount"))       Prefs.setWatchQuizCount(ctx, b.getInt("watchQuizCount"));
+                if (b.has("wrongAddCount"))        Prefs.setWrongAddCount(ctx, b.getInt("wrongAddCount"));
                 if (b.has("watchMonitorEnabled"))  Prefs.setWatchMonitorEnabled(ctx, b.getBoolean("watchMonitorEnabled"));
                 if (b.has("videoApps"))            Prefs.setVideoApps(ctx, b.getString("videoApps"));
                 if (b.has("parentSeq")) {
@@ -163,6 +165,8 @@ public class AdminServer extends NanoHTTPD {
         o.put("bootQuizEnabled", Prefs.bootQuizEnabled(ctx));
         o.put("bootQuestions", Prefs.bootQuestions(ctx));
         o.put("quizIntervalMin", Prefs.quizIntervalMin(ctx));
+        o.put("watchQuizCount", Prefs.watchQuizCount(ctx));
+        o.put("wrongAddCount", Prefs.wrongAddCount(ctx));
         o.put("watchMonitorEnabled", Prefs.watchMonitorEnabled(ctx));
         o.put("videoApps", Prefs.videoApps(ctx));
         // parentSeq / adminPass 不回传：孩子拿到手机也不应看到密码，只允许写入

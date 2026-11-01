@@ -29,6 +29,14 @@ public class Prefs {
     public static int bootQuestions(Context c)              { return get(c).getInt("bootQuestions", 3); }
     public static void setBootQuestions(Context c, int v)   { get(c).edit().putInt("bootQuestions", v).apply(); }
 
+    /** 观看弹题时一轮的初始答题数 */
+    public static int watchQuizCount(Context c)             { return get(c).getInt("watchQuizCount", 3); }
+    public static void setWatchQuizCount(Context c, int v)  { get(c).edit().putInt("watchQuizCount", v).apply(); }
+
+    /** 每答错一题追加的新题数 */
+    public static int wrongAddCount(Context c)              { return get(c).getInt("wrongAddCount", 2); }
+    public static void setWrongAddCount(Context c, int v)   { get(c).edit().putInt("wrongAddCount", v).apply(); }
+
     public static int quizIntervalMin(Context c)            { return get(c).getInt("quizIntervalMin", 10); }
     public static void setQuizIntervalMin(Context c, int v) { get(c).edit().putInt("quizIntervalMin", v).apply(); }
 
