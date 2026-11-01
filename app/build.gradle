@@ -14,9 +14,23 @@ android {
         versionName "0.5.0"
     }
 
+    // 固定签名：保证每次 CI 构建的 APK 可直接 install -r 覆盖安装，不会签名冲突
+    signingConfigs {
+        appSign {
+            storeFile file("debug.keystore")
+            storePassword "studylock2026"
+            keyAlias "studylock"
+            keyPassword "studylock2026"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.appSign
+        }
+        debug {
+            signingConfig signingConfigs.appSign
         }
     }
 
