@@ -16,13 +16,25 @@
   .row { display: flex; gap: 10px; } .row > * { flex: 1; }
   .msg { margin-top: 8px; font-size: 13px; color: #0F6E56; min-height: 18px; }
   .tag { font-size: 12px; color: #888; }
+  #lockScreen { display: none; }
 </style>
 </head>
 <body>
 
 <h1>学习门禁 · 管理页</h1>
-<p class="tag">与电视同一 Wi-Fi 下访问。所有数据只保存在电视本地。</p>
+<p class="tag">与电视同一 Wi-Fi 下访问。所有数据只保存在电视本地。本页需要管理密码登录。</p>
 <div id="status" class="msg"></div>
+<button class="gray" style="display:none" id="logoutBtn" onclick="logout()">退出登录</button>
+
+<div id="lockScreen" style="position:fixed; inset:0; background:rgba(20,24,31,.96); z-index:99; align-items:center; justify-content:center;">
+  <div style="background:#fff; padding:28px; border-radius:12px; width:min(360px, 90vw);">
+    <h2 style="margin:0 0 4px; border:0; padding:0;">管理页已锁定</h2>
+    <p class="tag">请输入管理密码（默认 0000，登录后请到"设置"里修改）</p>
+    <input id="loginPass" type="password" placeholder="管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" style="width:100%">登录</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+</div>
 
 <h2>远程解锁</h2>
 <label>家长方向密码（U=上 D=下 L=左 R=右，默认 UDUDLRLR）</label>
@@ -51,8 +63,10 @@
 </select>
 <label>观看监控（每满弹题间隔弹出答题，v0.8 完整支持）</label>
 <select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select>
-<label>家长方向密码（4-12位，U/D/L/R 组合，改完遥控器输入也随之变化）</label>
-<input id="parentSeq" placeholder="UDUDLRLR">
+<label>家长方向密码（4-12位，U/D/L/R 组合；留空表示不修改，不回显）</label>
+<input id="parentSeq" placeholder="留空则不修改">
+<label>管理密码（≥4位，用于登录本管理页；留空表示不修改）</label>
+<input id="adminPass" placeholder="留空则不修改">
 <label>视频类应用包名（逗号分隔，命中即计时弹题）</label>
 <textarea id="videoApps" rows="3"></textarea>
 <button onclick="saveConfig()">保存设置</button>
@@ -85,7 +99,9 @@
 <button class="gray" onclick="exportJson()">导出全部题目</button>
 <div id="ioMsg" class="msg"></div>
 
-<h2>薄弱分析（近 14 天，按科目）</h2>
+<h2>薄弱分析（近 14 天，按科目）
+  <button class="red" style="margin:0 0 0 10px; padding:4px 12px; font-size:12px; vertical-align:middle;" onclick="clearAttempts()">清空答题记录</button>
+</h2>
 <canvas id="chart" width="840" height="300" style="width:100%; border:1px solid #eee; border-radius:8px; background:#fff;"></canvas>
 <div id="chartLegend" class="tag" style="margin-top:6px;"></div>
 <h3 style="font-size:15px; margin-top:20px;">错得最多的题（Top 10）</h3>
@@ -99,11 +115,43 @@
 
 <script>
 const $ = id => document.getElementById(id);
+let TOKEN = localStorage.getItem('gate_token') || '';
 
 async function api(path, body) {
-  const opt = body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {};
-  const r = await fetch(path, opt);
-  return r.json();
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (TOKEN) headers['X-Token'] = TOKEN;
+  const r = await fetch(path, body ? {method:'POST', headers, body: JSON.stringify(body)} : {headers});
+  const data = await r.json();
+  if (data && data.auth === false) { showLock(); throw new Error('未登录'); }
+  return data;
+}
+
+function showLock() {
+  TOKEN = ''; localStorage.removeItem('gate_token');
+  $('lockScreen').style.display = 'flex';
+  $('logoutBtn').style.display = 'none';
+}
+
+async function doLogin() {
+  const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({pass: $('loginPass').value})});
+  const data = await r.json();
+  if (data.ok) {
+    TOKEN = data.token;
+    localStorage.setItem('gate_token', TOKEN);
+    $('lockScreen').style.display = 'none';
+    $('loginMsg').textContent = '';
+    $('logoutBtn').style.display = 'inline-block';
+    boot();
+  } else {
+    $('loginMsg').textContent = data.error || '登录失败';
+  }
+}
+
+function logout() {
+  TOKEN = ''; localStorage.removeItem('gate_token');
+  showLock();
 }
 
 async function refreshStatus() {
@@ -132,7 +180,8 @@ async function loadConfig() {
   $('bootQuestions').value = String(c.bootQuestions);
   $('quizIntervalMin').value = String(c.quizIntervalMin);
   $('watchMonitorEnabled').value = String(c.watchMonitorEnabled);
-  $('parentSeq').value = c.parentSeq;
+  $('parentSeq').value = '';   // 密码不回显，留空 = 不修改
+  $('adminPass').value = '';
   $('videoApps').value = c.videoApps;
   fillGradeTermSelect($('kidGradeTerm'), c.kidGrade + '-' + c.kidTerm);
   fillGradeTermSelect($('qGradeTerm'), c.kidGrade + '-' + c.kidTerm);
@@ -140,17 +189,22 @@ async function loadConfig() {
 
 async function saveConfig() {
   const gt = $('kidGradeTerm').value.split('-');
-  const r = await api('/api/config', {
+  const body = {
     gateEnabled: $('gateEnabled').value === 'true',
     bootQuestions: parseInt($('bootQuestions').value),
     quizIntervalMin: parseInt($('quizIntervalMin').value),
     watchMonitorEnabled: $('watchMonitorEnabled').value === 'true',
-    parentSeq: $('parentSeq').value.trim(),
     kidGrade: parseInt(gt[0]),
     kidTerm: parseInt(gt[1]),
     videoApps: $('videoApps').value.trim()
-  });
+  };
+  const seq = $('parentSeq').value.trim();
+  if (seq) body.parentSeq = seq;           // 留空不改
+  const ap = $('adminPass').value.trim();
+  if (ap) body.adminPass = ap;
+  const r = await api('/api/config', body);
   $('cfgMsg').textContent = r.ok ? '已保存。' : ('保存失败：' + r.error);
+  if (r.ok) { $('parentSeq').value = ''; $('adminPass').value = ''; }
   refreshStatus();
 }
 
@@ -193,6 +247,13 @@ async function clearAll() {
   if (!confirm('确定要清空全部题目吗？\n答题记录也会一起清掉，此操作不可恢复！\n建议先点"导出全部题目"备份。')) return;
   await api('/api/questions/clear', {});
   loadQuestions(); refreshStatus(); loadStats();
+}
+
+async function clearAttempts() {
+  if (!confirm('确定要清空全部答题记录吗？\n只删除"薄弱分析"的统计数据，题库不受影响。')) return;
+  await api('/api/attempts/clear', {});
+  loadStats();
+  $('weakEmpty').textContent = '答题记录已清空。';
 }
 
 async function importJson() {
@@ -293,7 +354,12 @@ function drawChart(days, subjects, byS) {
   });
 }
 
-refreshStatus(); loadConfig(); loadQuestions(); loadStats();
+function boot() {
+  refreshStatus(); loadConfig(); loadQuestions(); loadStats();
+}
+
+// 已有有效令牌则直接进入，否则弹出登录锁
+if (TOKEN) boot(); else showLock();
 </script>
 </body>
 </html>

@@ -20,6 +20,11 @@ import fi.iki.elonen.NanoHTTPD;
 public class AdminServer extends NanoHTTPD {
 
     private final Context ctx;
+    /** 登录成功后的会话令牌（内存态，App 重启后需重新登录） */
+    private volatile String sessionToken;
+    /** 管理密码连续输错 5 次，锁定 10 分钟 */
+    private int loginFails = 0;
+    private volatile long loginLockUntil = 0L;
 
     public AdminServer(Context ctx, int port) {
         super("0.0.0.0", port);
@@ -32,6 +37,15 @@ public class AdminServer extends NanoHTTPD {
         try {
             if ("/".equals(uri) || "/index.html".equals(uri)) {
                 return asset("admin.html", "text/html; charset=utf-8");
+            }
+            // ---- 登录（唯一免鉴权接口）----
+            if ("/api/login".equals(uri) && session.getMethod() == Method.POST) {
+                return login(new JSONObject(body(session)));
+            }
+            // ---- 其余全部接口需要会话令牌 ----
+            if (!authorized(session)) {
+                return json(new JSONObject().put("ok", false).put("auth", false)
+                        .put("error", "未登录或登录已过期"));
             }
             if ("/api/status".equals(uri)) {
                 return json(status());
@@ -82,6 +96,10 @@ public class AdminServer extends NanoHTTPD {
                 o.put("weak", Db.get(ctx).weakQuestions(10));
                 return json(o);
             }
+            if ("/api/attempts/clear".equals(uri) && session.getMethod() == Method.POST) {
+                Db.get(ctx).clearAttempts();
+                return json(new JSONObject().put("ok", true));
+            }
             if ("/api/config".equals(uri)) {
                 if (session.getMethod() == Method.GET) return json(config());
                 JSONObject b = new JSONObject(body(session));
@@ -93,6 +111,10 @@ public class AdminServer extends NanoHTTPD {
                 if (b.has("parentSeq")) {
                     String seq = b.getString("parentSeq").toUpperCase().replaceAll("[^UDLR]", "");
                     if (seq.length() >= 4) Prefs.setParentSeq(ctx, seq);
+                }
+                if (b.has("adminPass")) {
+                    String pass = b.getString("adminPass").trim();
+                    if (pass.length() >= 4) Prefs.setAdminPass(ctx, pass);
                 }
                 if (b.has("kidGrade")) Prefs.setKidGrade(ctx, b.getInt("kidGrade"));
                 if (b.has("kidTerm")) Prefs.setKidTerm(ctx, b.getInt("kidTerm"));
@@ -136,10 +158,43 @@ public class AdminServer extends NanoHTTPD {
         o.put("quizIntervalMin", Prefs.quizIntervalMin(ctx));
         o.put("watchMonitorEnabled", Prefs.watchMonitorEnabled(ctx));
         o.put("videoApps", Prefs.videoApps(ctx));
-        o.put("parentSeq", Prefs.parentSeq(ctx));
+        // parentSeq / adminPass 不回传：孩子拿到手机也不应看到密码，只允许写入
         o.put("kidGrade", Prefs.kidGrade(ctx));
         o.put("kidTerm", Prefs.kidTerm(ctx));
         return o;
+    }
+
+    /** 校验会话令牌 */
+    private boolean authorized(IHTTPSession session) {
+        String token = sessionToken;
+        if (token == null) return false;
+        String given = session.getHeaders().get("x-token");
+        return token.equals(given);
+    }
+
+    /** 管理密码登录：成功返回会话令牌；连错 5 次锁定 10 分钟 */
+    private Response login(JSONObject body) throws Exception {
+        long now = System.currentTimeMillis();
+        if (now < loginLockUntil) {
+            long waitMin = (loginLockUntil - now) / 60000 + 1;
+            return json(new JSONObject().put("ok", false)
+                    .put("error", "尝试次数过多，已锁定，请约 " + waitMin + " 分钟后再试"));
+        }
+        String pass = body.optString("pass", "");
+        if (pass.equals(Prefs.adminPass(ctx))) {
+            loginFails = 0;
+            sessionToken = java.util.UUID.randomUUID().toString();
+            return json(new JSONObject().put("ok", true).put("token", sessionToken));
+        }
+        loginFails++;
+        if (loginFails >= 5) {
+            loginLockUntil = now + 10 * 60000L;
+            loginFails = 0;
+            return json(new JSONObject().put("ok", false)
+                    .put("error", "密码错误次数过多，已锁定 10 分钟"));
+        }
+        return json(new JSONObject().put("ok", false)
+                .put("error", "管理密码错误（还剩 " + (5 - loginFails) + " 次机会）"));
     }
 
     /** 直接按 UTF-8 读取原始请求体（绕过 NanoHTTPD 的 ISO-8859-1 解码，避免中文乱码） */

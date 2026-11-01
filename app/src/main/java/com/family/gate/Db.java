@@ -95,6 +95,11 @@ public class Db extends SQLiteOpenHelper {
         db.delete("attempts", null, null);
     }
 
+    /** 只清空答题记录（薄弱分析数据），保留题库 */
+    public void clearAttempts() {
+        getWritableDatabase().delete("attempts", null, null);
+    }
+
     public int countEnabled() {
         Cursor c = getReadableDatabase()
                 .rawQuery("SELECT COUNT(*) FROM questions WHERE enabled=1", null);

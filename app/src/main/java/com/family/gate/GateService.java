@@ -48,12 +48,14 @@ public class GateService extends Service {
     private TextView titleText, progressText, stemText, hintText;
     private TextView[] optionViews = new TextView[4];
     private LinearLayout quizPanel, pinPanel, durationPanel;
-    private TextView pinDots, pinTitle;
+    private TextView pinDots, pinTitle, pinMsg;
 
     private QuizEngine engine;
     private int sel = 0;
     private int durationSel = 0;
     private StringBuilder pinInput = new StringBuilder();
+    private int pinFails = 0;
+    private long pinLockUntil = 0L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean okDown = false;
@@ -203,8 +205,11 @@ public class GateService extends Service {
         pinDots = makeText("", 30, Color.parseColor("#9FE1CB"), true);
         pinDots.setGravity(Gravity.CENTER);
         pinPanel.addView(pinDots, lp(40));
-        pinPanel.addView(makeText("用遥控器方向键输入（输错自动清空；按返回键退回答题）", 15,
-                Color.parseColor("#88FFFFFF"), false), lp(20));
+        pinMsg = makeText("", 16, Color.parseColor("#FF8A80"), false);
+        pinMsg.setGravity(Gravity.CENTER);
+        pinPanel.addView(pinMsg, lp(6));
+        pinPanel.addView(makeText("用遥控器方向键输完 8 位后自动校验（按返回键退回答题）", 15,
+                Color.parseColor("#88FFFFFF"), false), lp(8));
 
         // 放行时长面板
         durationPanel = new LinearLayout(this);
@@ -260,10 +265,15 @@ public class GateService extends Service {
             if (sel >= visible) sel = 0;
         } else if (mode == MODE_PIN) {
             int total = Prefs.parentSeq(this).length();
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < total; i++)
-                sb.append(i < pinInput.length() ? "● " : "○ ");
-            pinDots.setText(sb.toString());
+            if (System.currentTimeMillis() < pinLockUntil) {
+                long waitMin = (pinLockUntil - System.currentTimeMillis()) / 60000 + 1;
+                pinDots.setText("🔒 已锁定，请约 " + waitMin + " 分钟后再试");
+            } else {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < total; i++)
+                    sb.append(i < pinInput.length() ? "● " : "○ ");
+                pinDots.setText(sb.toString());
+            }
         } else if (mode == MODE_DURATION) {
             for (int i = 0; i < DURATIONS.length; i++) {
                 TextView v = (TextView) durationPanel.getChildAt(i + 1);
@@ -343,15 +353,34 @@ public class GateService extends Service {
         String seq = Prefs.parentSeq(this);
         String key = dirOf(keyCode);
         if (key == null) return; // 只接受方向键
-        pinInput.append(key);
-        if (!seq.startsWith(pinInput.toString())) {
-            pinInput.setLength(0); // 输错清空重来
-        } else if (pinInput.length() == seq.length()) {
-            pinInput.setLength(0);
-            mode = MODE_DURATION;
-            durationSel = 0;
-            applyMode(); // 切换到放行时长面板
+        // 锁定中不接受输入
+        if (System.currentTimeMillis() < pinLockUntil) {
+            render();
             return;
+        }
+        // 输入阶段不校验，攒满长度后统一比对（输错不在中途清空）
+        if (pinInput.length() >= seq.length()) pinInput.setLength(0);
+        pinInput.append(key);
+        pinMsg.setText("");
+        if (pinInput.length() == seq.length()) {
+            if (pinInput.toString().equals(seq)) {
+                pinFails = 0;
+                pinInput.setLength(0);
+                mode = MODE_DURATION;
+                durationSel = 0;
+                applyMode(); // 切换到放行时长面板
+                return;
+            }
+            // 密码错误：清空重来，连错 5 次锁定 10 分钟
+            pinInput.setLength(0);
+            pinFails++;
+            if (pinFails >= 5) {
+                pinLockUntil = System.currentTimeMillis() + 10 * 60000L;
+                pinFails = 0;
+                pinMsg.setText("错误次数过多，已锁定 10 分钟");
+            } else {
+                pinMsg.setText("密码错误，请重新输入（还剩 " + (5 - pinFails) + " 次机会）");
+            }
         }
         render();
     }
@@ -418,6 +447,7 @@ public class GateService extends Service {
         okDown = false;
         mode = MODE_PIN;
         pinInput.setLength(0);
+        pinMsg.setText("");
         applyMode();
     }
 

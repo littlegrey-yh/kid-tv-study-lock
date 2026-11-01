@@ -41,6 +41,10 @@ public class Prefs {
     public static String parentSeq(Context c)               { return get(c).getString("parentSeq", DEFAULT_PARENT_SEQ); }
     public static void setParentSeq(Context c, String v)    { get(c).edit().putString("parentSeq", v).apply(); }
 
+    /** 管理页访问密码（局域网任何设备都能打开管理页，必须有密码保护） */
+    public static String adminPass(Context c)               { return get(c).getString("adminPass", "0000"); }
+    public static void setAdminPass(Context c, String v)    { get(c).edit().putString("adminPass", v).apply(); }
+
     /** 视频类应用包名，逗号分隔 */
     public static String videoApps(Context c) {
         return get(c).getString("videoApps",
