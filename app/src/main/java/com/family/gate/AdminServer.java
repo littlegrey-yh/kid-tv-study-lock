@@ -63,6 +63,10 @@ public class AdminServer extends NanoHTTPD {
                 Db.get(ctx).setEnabled(b.getLong("id"), b.optBoolean("enabled", true));
                 return json(new JSONObject().put("ok", true));
             }
+            if ("/api/questions/clear".equals(uri) && session.getMethod() == Method.POST) {
+                Db.get(ctx).clearQuestions();
+                return json(new JSONObject().put("ok", true));
+            }
             if ("/api/export".equals(uri)) {
                 return json(new JSONObject(Db.get(ctx).exportJson()));
             }

@@ -92,7 +92,9 @@
 <table id="wtable"><thead><tr><th>科目</th><th>题干</th><th>答题次数</th><th>错误次数</th><th>正确率</th></tr></thead><tbody></tbody></table>
 <div id="weakEmpty" class="msg"></div>
 
-<h2>题库（<span id="count">0</span> 题）</h2>
+<h2>题库（<span id="count">0</span> 题）
+  <button class="red" style="margin:0 0 0 10px; padding:4px 12px; font-size:12px; vertical-align:middle;" onclick="clearAll()">清空题库</button>
+</h2>
 <table id="qtable"><thead><tr><th>科目</th><th>年级</th><th>题干</th><th>答案</th><th>启用</th><th></th></tr></thead><tbody></tbody></table>
 
 <script>
@@ -186,6 +188,12 @@ async function loadQuestions() {
 
 async function del(id)        { await api('/api/questions/delete', {id}); loadQuestions(); refreshStatus(); }
 async function toggle(id, en) { await api('/api/questions/enable', {id, enabled: en}); loadQuestions(); }
+
+async function clearAll() {
+  if (!confirm('确定要清空全部题目吗？\n答题记录也会一起清掉，此操作不可恢复！\n建议先点"导出全部题目"备份。')) return;
+  await api('/api/questions/clear', {});
+  loadQuestions(); refreshStatus(); loadStats();
+}
 
 async function importJson() {
   const r = await api('/api/import', {json: $('importBox').value});

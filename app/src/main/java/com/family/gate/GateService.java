@@ -57,9 +57,13 @@ public class GateService extends Service {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean okDown = false;
+    private boolean okLongFired = false;
     private final Runnable longPressRunnable = new Runnable() {
         @Override public void run() {
-            if (okDown && mode == MODE_QUIZ) enterPinMode();
+            if (okDown && mode == MODE_QUIZ) {
+                okLongFired = true;
+                enterPinMode();
+            }
         }
     };
 
@@ -270,13 +274,15 @@ public class GateService extends Service {
 
     private View.OnKeyListener keyListener = new View.OnKeyListener() {
         @Override public boolean onKey(View v, int keyCode, KeyEvent event) {
+            boolean ok = keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                    || keyCode == KeyEvent.KEYCODE_ENTER;
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (mode == MODE_QUIZ && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-                        || keyCode == KeyEvent.KEYCODE_ENTER)) {
-                    if (!okDown) {
-                        okDown = true;
-                        handler.postDelayed(longPressRunnable, 3000);
-                    }
+                if (event.getRepeatCount() > 0) return true; // 忽略长按连发，防止串键
+                if (ok) {
+                    // OK 按下：启动 3 秒长按计时；提交动作在抬起时判断
+                    okDown = true;
+                    okLongFired = false;
+                    handler.postDelayed(longPressRunnable, 3000);
                     return true;
                 }
                 switch (mode) {
@@ -285,11 +291,15 @@ public class GateService extends Service {
                     case MODE_DURATION: handleDurationKey(keyCode); return true;
                 }
                 return true;
-            } else if (event.getAction() == KeyEvent.ACTION_UP
-                    && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
-                    || keyCode == KeyEvent.KEYCODE_ENTER)) {
-                okDown = false;
+            } else if (event.getAction() == KeyEvent.ACTION_UP && ok) {
                 handler.removeCallbacks(longPressRunnable);
+                if (okDown && !okLongFired && mode == MODE_QUIZ) {
+                    // 短按 OK：提交当前选项
+                    okDown = false;
+                    handleQuizKey(keyCode);
+                    return true;
+                }
+                okDown = false;
                 return true;
             }
             return true; // 悬浮窗内吞掉所有按键，防止逃逸

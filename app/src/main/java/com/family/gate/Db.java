@@ -88,6 +88,13 @@ public class Db extends SQLiteOpenHelper {
         getWritableDatabase().update("questions", cv, "id=?", new String[]{String.valueOf(id)});
     }
 
+    /** 清空全部题目和答题记录（家长在管理页显式确认后调用） */
+    public void clearQuestions() {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("questions", null, null);
+        db.delete("attempts", null, null);
+    }
+
     public int countEnabled() {
         Cursor c = getReadableDatabase()
                 .rawQuery("SELECT COUNT(*) FROM questions WHERE enabled=1", null);
@@ -175,12 +182,17 @@ public class Db extends SQLiteOpenHelper {
         return arr;
     }
 
-    /** 批量导入题目，未带年级信息的题使用默认年级/学期，返回导入条数 */
+    /** 批量导入题目，支持纯数组或 {"questions":[...]} 两种格式，返回导入条数 */
     public int importJson(String json, int defGrade, int defTerm) throws Exception {
+        String s = json.trim();
         JSONArray arr;
-        JSONObject top = new JSONObject(json);
-        arr = top.optJSONArray("questions");
-        if (arr == null) arr = new JSONArray(json);
+        if (s.startsWith("[")) {
+            arr = new JSONArray(s);
+        } else {
+            JSONObject top = new JSONObject(s);
+            arr = top.optJSONArray("questions");
+            if (arr == null) arr = new JSONArray(s);
+        }
         int n = 0;
         for (int i = 0; i < arr.length(); i++) {
             Question q = Question.fromJson(arr.getJSONObject(i));
