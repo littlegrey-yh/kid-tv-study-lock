@@ -76,21 +76,32 @@ public class WatchMonitorService extends Service {
     }
 
     private void check() {
-        if (!Prefs.gateEnabled(this)) return;     // 总开关关闭：不计时不弹题
-        if (GateService.showing) return;          // 答题弹窗已弹出，暂停计时
-        if (Prefs.isUnlockedNow(this)) return;    // 家长放行期内
-        if (!Prefs.watchMonitorEnabled(this)) return;
+        if (!Prefs.gateEnabled(this)) { diag("跳过: 总开关关"); return; }
+        if (GateService.showing)     { diag("跳过: 答题弹窗中"); return; }
+        if (Prefs.isUnlockedNow(this)) { diag("跳过: 家长放行期至 "
+                + java.text.DateFormat.getTimeInstance().format(
+                        new java.util.Date(Prefs.unlockUntil(this)))); return; }
+        if (!Prefs.watchMonitorEnabled(this)) { diag("跳过: 监控开关关"); return; }
 
-        String foreground = getForegroundPackage();
-        if (foreground == null) return;
-        if (!Prefs.containsVideoApp(this, foreground)) return;
+        String fg = getForegroundPackage();
+        boolean inList = fg != null && Prefs.containsVideoApp(this, fg);
+        if (!inList) { diag("前台=" + fg + " 不在名单, 已计 " + watchedSec + "s"); return; }
 
         watchedSec += (int) (CHECK_INTERVAL_MS / 1000);
         int limitSec = Prefs.quizIntervalMin(this) * 60;
+        diag("计时中 前台=" + fg + " " + watchedSec + "/" + limitSec + "s");
         if (watchedSec >= limitSec) {
             watchedSec = 0;
-            if (!GateService.showing) GateService.show(this, false);
+            if (!GateService.showing) {
+                diag(">>> 达到间隔，弹题！");
+                GateService.show(this, false);
+            }
         }
+    }
+
+    /** 可观测日志（该 ROM 屏蔽 Log.d，必须用 Log.i） */
+    private void diag(String msg) {
+        android.util.Log.i("LearningGate", "[监控] " + msg);
     }
 
     private String lastForeground = null;
@@ -98,24 +109,29 @@ public class WatchMonitorService extends Service {
     private String getForegroundPackage() {
         try {
             UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
-            if (usm == null) return null;
+            if (usm == null) { diag("usm=null"); return null; }
             long now = System.currentTimeMillis();
             // 查最近 30 分钟事件取最新一条；一直挂着的场景没有新事件时沿用上次结果
             UsageEvents ev = usm.queryEvents(now - 30 * 60000L, now);
             UsageEvents.Event e = new UsageEvents.Event();
             String last = null;
+            int n = 0;
             while (ev.hasNextEvent()) {
                 ev.getNextEvent(e);
+                n++;
                 if (e.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND) {
                     last = e.getPackageName();
                 }
             }
             if (last != null) lastForeground = last;
-            android.util.Log.d("LearningGate", "foreground=" + lastForeground
-                    + " watchedSec=" + watchedSec);
+            if (n == 0) diag("30分钟窗口内无任何事件(权限?)");
             return lastForeground;
+        } catch (SecurityException se) {
+            diag("无使用情况权限: " + se.getMessage());
+            return null;
         } catch (Exception ex) {
-            return null; // 无"使用情况访问"权限时静默跳过
+            diag("前台识别异常: " + ex);
+            return null;
         }
     }
 

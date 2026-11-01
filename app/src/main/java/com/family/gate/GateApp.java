@@ -32,7 +32,7 @@ public class GateApp extends Application {
     }
 
     private static void log(String msg) {
-        android.util.Log.d("LearningGate", msg);
+        android.util.Log.i("LearningGate", msg);
     }
 
     private void startAdminServer() {

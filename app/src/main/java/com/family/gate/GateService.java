@@ -70,7 +70,8 @@ public class GateService extends Service {
         }
     };
 
-    private static final String[] DURATIONS = {"本次放行（30 分钟）", "放行 1 小时", "放行 2 小时", "今日剩余时间"};
+    private static final String[] DURATIONS = {"放行 1 分钟", "本次放行（30 分钟）", "放行 1 小时",
+            "放行 1.5 小时", "放行 2 小时", "今日剩余时间"};
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -411,15 +412,17 @@ public class GateService extends Service {
             case KeyEvent.KEYCODE_ENTER:
                 int minutes;
                 switch (durationSel) {
-                    case 0: minutes = 30; break;
-                    case 1: minutes = 60; break;
-                    case 2: minutes = 120; break;
+                    case 0:  minutes = 1;   break;   // 1 分钟
+                    case 1:  minutes = 30;  break;   // 30 分钟
+                    case 2:  minutes = 60;  break;   // 1 小时
+                    case 3:  minutes = 90;  break;   // 1.5 小时
+                    case 4:  minutes = 120; break;   // 2 小时
                     default:
                         Calendar c = Calendar.getInstance();
                         c.set(Calendar.HOUR_OF_DAY, 23);
                         c.set(Calendar.MINUTE, 59);
                         c.set(Calendar.SECOND, 59);
-                        minutes = (int) Math.max(30,
+                        minutes = (int) Math.max(1,
                                 (c.getTimeInMillis() - System.currentTimeMillis()) / 60000);
                 }
                 unlock(minutes);

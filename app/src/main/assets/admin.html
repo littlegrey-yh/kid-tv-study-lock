@@ -40,8 +40,10 @@
 <label>家长方向密码（U=上 D=下 L=左 R=右，默认 UDUDLRLR）</label>
 <input id="unlockSeq" placeholder="UDUDLRLR">
 <div>
+  <button onclick="unlock(1)">放行1分钟</button>
   <button onclick="unlock(30)">放行30分钟</button>
   <button onclick="unlock(60)">放行1小时</button>
+  <button onclick="unlock(90)">放行1.5小时</button>
   <button onclick="unlock(120)">放行2小时</button>
 </div>
 <div id="unlockMsg" class="msg"></div>
@@ -51,7 +53,7 @@
   <div><label>门禁总开关（关闭后所有弹题都不工作）</label><select id="gateEnabled"><option value="true">开启</option><option value="false">关闭</option></select></div>
   <div><label>开机弹答题（默认关；雷鸟无开机广告，可不弹）</label><select id="bootQuizEnabled"><option value="true">开机弹</option><option value="false" selected>不弹</option></select></div>
   <div><label>开机答题数（答对几题放行）</label><select id="bootQuestions"><option>3</option><option>5</option><option>10</option></select></div>
-  <div><label>观看弹题间隔（分钟）</label><select id="quizIntervalMin"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
+  <div><label>观看弹题间隔（分钟）</label><select id="quizIntervalMin"><option>1</option><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></div>
 </div>
 <label>观看监控（观看视频每满间隔时间弹出答题，需总开关开启）</label>
 <select id="watchMonitorEnabled"><option value="true">开启</option><option value="false" selected>关闭</option></select>
