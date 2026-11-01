@@ -34,6 +34,7 @@ public class GateService extends Service {
 
     public static final String ACTION_SHOW_BOOT = "com.family.gate.SHOW_BOOT";
     public static final String ACTION_SHOW_QUIZ = "com.family.gate.SHOW_QUIZ";
+    public static final String ACTION_SHOW_TEST = "com.family.gate.SHOW_TEST";
     public static final String ACTION_HIDE      = "com.family.gate.HIDE";
 
     /** 供其他组件读取的悬浮窗状态 */
@@ -89,10 +90,18 @@ public class GateService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (!Prefs.gateEnabled(this) && ACTION_SHOW_BOOT.equals(action)) {
+        // 开机弹题：需总开关 + 开机弹题开关都打开
+        if (ACTION_SHOW_BOOT.equals(action)
+                && (!Prefs.gateEnabled(this) || !Prefs.bootQuizEnabled(this))) {
             stopSelf();
             return START_NOT_STICKY;
         }
+        // 观看弹题：只需总开关打开（双保险，监控服务自身也会检查）
+        if (ACTION_SHOW_QUIZ.equals(action) && !Prefs.gateEnabled(this)) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        // 手动测试（SHOW_TEST）：不做开关限制，方便家长随时验证
         Db db = Db.get(this);
         if (db.countEnabled() == 0) {
             // 题库为空：绝不锁死孩子（FR-4.2）
@@ -107,7 +116,7 @@ public class GateService extends Service {
 
     private void showOverlay(String action) {
         if (root != null) { render(); return; }
-        boolean boot = ACTION_SHOW_BOOT.equals(action);
+        boolean boot = ACTION_SHOW_BOOT.equals(action) || ACTION_SHOW_TEST.equals(action);
         engine = QuizEngine.start(Db.get(this),
                 boot ? Prefs.bootQuestions(this) : 3,
                 Prefs.kidGrade(this), Prefs.kidTerm(this));
@@ -478,6 +487,14 @@ public class GateService extends Service {
     public static void show(Context ctx, boolean boot) {
         Intent i = new Intent(ctx, GateService.class);
         i.setAction(boot ? ACTION_SHOW_BOOT : ACTION_SHOW_QUIZ);
+        if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
+        else ctx.startService(i);
+    }
+
+    /** 家长手动测试：不受任何开关限制 */
+    public static void showTest(Context ctx) {
+        Intent i = new Intent(ctx, GateService.class);
+        i.setAction(ACTION_SHOW_TEST);
         if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
         else ctx.startService(i);
     }

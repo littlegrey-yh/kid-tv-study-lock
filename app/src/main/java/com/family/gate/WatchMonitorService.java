@@ -76,6 +76,7 @@ public class WatchMonitorService extends Service {
     }
 
     private void check() {
+        if (!Prefs.gateEnabled(this)) return;     // 总开关关闭：不计时不弹题
         if (GateService.showing) return;          // 答题弹窗已弹出，暂停计时
         if (Prefs.isUnlockedNow(this)) return;    // 家长放行期内
         if (!Prefs.watchMonitorEnabled(this)) return;
@@ -114,6 +115,13 @@ public class WatchMonitorService extends Service {
 
     public static void start(Context ctx) {
         Intent i = new Intent(ctx, WatchMonitorService.class);
+        if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
+        else ctx.startService(i);
+    }
+
+    public static void stop(Context ctx) {
+        Intent i = new Intent(ctx, WatchMonitorService.class);
+        i.setAction("STOP");
         if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
         else ctx.startService(i);
     }

@@ -22,6 +22,10 @@ public class Prefs {
     public static boolean gateEnabled(Context c)            { return get(c).getBoolean("gateEnabled", false); }
     public static void setGateEnabled(Context c, boolean v) { get(c).edit().putBoolean("gateEnabled", v).apply(); }
 
+    /** 开机弹答题：默认关（雷鸟无开机广告，非必须；仅总开关打开且此项打开时开机才弹） */
+    public static boolean bootQuizEnabled(Context c)            { return get(c).getBoolean("bootQuizEnabled", false); }
+    public static void setBootQuizEnabled(Context c, boolean v) { get(c).edit().putBoolean("bootQuizEnabled", v).apply(); }
+
     public static int bootQuestions(Context c)              { return get(c).getInt("bootQuestions", 3); }
     public static void setBootQuestions(Context c, int v)   { get(c).edit().putInt("bootQuestions", v).apply(); }
 

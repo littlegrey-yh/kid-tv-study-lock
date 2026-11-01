@@ -70,7 +70,7 @@ public class MainActivity extends Activity {
                     statusText.setText("题库为空！请先用手机浏览器打开管理页录题。");
                     return;
                 }
-                GateService.show(MainActivity.this, true);
+                GateService.showTest(MainActivity.this);
                 finish();
             }
         }));
@@ -120,10 +120,11 @@ public class MainActivity extends Activity {
         String ip = localIp();
         String url = ip == null ? "（电视未联网）" : "http://" + ip + ":8765";
         String s = "管理页地址（手机浏览器打开）：" + url
-                + "\n\n门禁开关：" + (Prefs.gateEnabled(this) ? "已开启" : "未开启（去管理页打开）")
+                + "\n\n门禁总开关：" + (Prefs.gateEnabled(this) ? "已开启" : "未开启（关闭时任何弹题都不工作）")
+                + "\n开机弹答题：" + (Prefs.bootQuizEnabled(this) ? "已开启" : "已关闭（默认关，管理页可开）")
+                + "\n观看监控：" + (Prefs.watchMonitorEnabled(this) ? "已开启（每 "
+                        + Prefs.quizIntervalMin(this) + " 分钟弹题）" : "已关闭")
                 + "\n题库题目数：" + Db.get(this).countEnabled()
-                + "\n开机答题数：" + Prefs.bootQuestions(this) + " 题"
-                + "\n弹题间隔：" + Prefs.quizIntervalMin(this) + " 分钟"
                 + "\n家长方向密码：已设置（内容不在此显示，家长请查看纸质/本地手册或管理页）"
                 + "\n\n家长解锁：门禁界面长按 OK 键 3 秒 → 输入方向密码 → 选择放行时长"
                 + "\n\n说明：②使用情况权限只在开启\"观看监控\"（每满10分钟弹题）时用，"

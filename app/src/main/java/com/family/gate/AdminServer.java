@@ -104,6 +104,7 @@ public class AdminServer extends NanoHTTPD {
                 if (session.getMethod() == Method.GET) return json(config());
                 JSONObject b = new JSONObject(body(session));
                 if (b.has("gateEnabled"))          Prefs.setGateEnabled(ctx, b.getBoolean("gateEnabled"));
+                if (b.has("bootQuizEnabled"))      Prefs.setBootQuizEnabled(ctx, b.getBoolean("bootQuizEnabled"));
                 if (b.has("bootQuestions"))        Prefs.setBootQuestions(ctx, b.getInt("bootQuestions"));
                 if (b.has("quizIntervalMin"))      Prefs.setQuizIntervalMin(ctx, b.getInt("quizIntervalMin"));
                 if (b.has("watchMonitorEnabled"))  Prefs.setWatchMonitorEnabled(ctx, b.getBoolean("watchMonitorEnabled"));
@@ -118,7 +119,12 @@ public class AdminServer extends NanoHTTPD {
                 }
                 if (b.has("kidGrade")) Prefs.setKidGrade(ctx, b.getInt("kidGrade"));
                 if (b.has("kidTerm")) Prefs.setKidTerm(ctx, b.getInt("kidTerm"));
-                if (b.optBoolean("watchMonitorEnabled")) WatchMonitorService.start(ctx);
+                // 监控服务随两个开关联动：总开关 + 观看监控都开才运行
+                if (Prefs.gateEnabled(ctx) && Prefs.watchMonitorEnabled(ctx)) {
+                    WatchMonitorService.start(ctx);
+                } else {
+                    WatchMonitorService.stop(ctx);
+                }
                 return json(new JSONObject().put("ok", true));
             }
             if ("/api/unlock".equals(uri) && session.getMethod() == Method.POST) {
@@ -154,6 +160,7 @@ public class AdminServer extends NanoHTTPD {
     private JSONObject config() throws Exception {
         JSONObject o = new JSONObject();
         o.put("gateEnabled", Prefs.gateEnabled(ctx));
+        o.put("bootQuizEnabled", Prefs.bootQuizEnabled(ctx));
         o.put("bootQuestions", Prefs.bootQuestions(ctx));
         o.put("quizIntervalMin", Prefs.quizIntervalMin(ctx));
         o.put("watchMonitorEnabled", Prefs.watchMonitorEnabled(ctx));
