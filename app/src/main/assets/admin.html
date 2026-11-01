@@ -69,8 +69,8 @@
 <div class="cfggroup"><div class="cfgtitle">③ 观看弹题（观看监控开启时生效）</div>
   <div class="row">
     <div><label>弹题间隔（看满几分钟弹一次）</label><select id="quizIntervalMin"><option>1</option><option>5</option><option selected>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></div>
-    <div><label>观看答题数（每次弹出先答几题）</label><select id="watchQuizCount"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option></select></div>
-    <div><label>错误追加题数（每答错 1 题追加几道新题）</label><select id="wrongAddCount"><option>0</option><option>1</option><option value="2" selected>2</option><option>3</option><option>4</option><option>5</option></select></div>
+    <div><label>观看答题数（每次弹出先答几题，1-20）</label><input id="watchQuizCount" type="number" min="1" max="20" value="3"></div>
+    <div><label>错误追加题数（每答错 1 题追加几道，0-10）</label><input id="wrongAddCount" type="number" min="0" max="10" value="2"></div>
   </div>
 </div>
 

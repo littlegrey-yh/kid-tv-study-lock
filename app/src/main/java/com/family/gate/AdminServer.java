@@ -106,9 +106,9 @@ public class AdminServer extends NanoHTTPD {
                 if (b.has("gateEnabled"))          Prefs.setGateEnabled(ctx, b.getBoolean("gateEnabled"));
                 if (b.has("bootQuizEnabled"))      Prefs.setBootQuizEnabled(ctx, b.getBoolean("bootQuizEnabled"));
                 if (b.has("bootQuestions"))        Prefs.setBootQuestions(ctx, b.getInt("bootQuestions"));
-                if (b.has("quizIntervalMin"))      Prefs.setQuizIntervalMin(ctx, b.getInt("quizIntervalMin"));
-                if (b.has("watchQuizCount"))       Prefs.setWatchQuizCount(ctx, b.getInt("watchQuizCount"));
-                if (b.has("wrongAddCount"))        Prefs.setWrongAddCount(ctx, b.getInt("wrongAddCount"));
+                if (b.has("quizIntervalMin"))      Prefs.setQuizIntervalMin(ctx, Math.max(1, Math.min(60, b.getInt("quizIntervalMin"))));
+                if (b.has("watchQuizCount"))       Prefs.setWatchQuizCount(ctx, Math.max(1, Math.min(20, b.getInt("watchQuizCount"))));
+                if (b.has("wrongAddCount"))        Prefs.setWrongAddCount(ctx, Math.max(0, Math.min(10, b.getInt("wrongAddCount"))));
                 if (b.has("watchMonitorEnabled"))  Prefs.setWatchMonitorEnabled(ctx, b.getBoolean("watchMonitorEnabled"));
                 if (b.has("videoApps"))            Prefs.setVideoApps(ctx, b.getString("videoApps"));
                 if (b.has("parentSeq")) {
