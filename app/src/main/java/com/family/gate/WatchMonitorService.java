@@ -93,12 +93,15 @@ public class WatchMonitorService extends Service {
         }
     }
 
+    private String lastForeground = null;
+
     private String getForegroundPackage() {
         try {
             UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
             if (usm == null) return null;
             long now = System.currentTimeMillis();
-            UsageEvents ev = usm.queryEvents(now - 120000, now);
+            // 查最近 30 分钟事件取最新一条；一直挂着的场景没有新事件时沿用上次结果
+            UsageEvents ev = usm.queryEvents(now - 30 * 60000L, now);
             UsageEvents.Event e = new UsageEvents.Event();
             String last = null;
             while (ev.hasNextEvent()) {
@@ -107,7 +110,10 @@ public class WatchMonitorService extends Service {
                     last = e.getPackageName();
                 }
             }
-            return last;
+            if (last != null) lastForeground = last;
+            android.util.Log.d("LearningGate", "foreground=" + lastForeground
+                    + " watchedSec=" + watchedSec);
+            return lastForeground;
         } catch (Exception ex) {
             return null; // 无"使用情况访问"权限时静默跳过
         }
